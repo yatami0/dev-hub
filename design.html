@@ -99,12 +99,13 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 <header class="top">
   <div class="eyebrow">設計資料 / 2026-11-22 時点</div>
   <h1>開発基盤のデータ設計</h1>
-  <p class="lead">Claude が並列で進める作業を、1か所のデータで統制するための設計です。主役は「作業」で、リポジトリやブランチはその持ち物として扱います。人はこのデータを画面越しに見るだけで、必要なときだけ中身を追いに行きます。</p>
+  <p class="lead">Claude が並列で進める作業を、1か所のデータで統制するための設計です。主役は「作業」で、リポジトリやブランチは作業に所属するものとして扱います。人はこのデータを画面越しに見るだけで、必要なときだけ中身を追いに行きます。</p>
   <nav class="toc" aria-label="目次">
+    <a href="#terms">用語</a>
     <a href="#principles">考え方</a>
     <a href="#overview">全体像</a>
     <a href="#model">6つのデータ</a>
-    <a href="#fields">欄の定義</a>
+    <a href="#fields">項目の定義</a>
     <a href="#states">状態</a>
     <a href="#rules">ルール</a>
     <a href="#roles">Claude と人の分担</a>
@@ -115,26 +116,45 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   </nav>
 </header>
 
+<section id="terms">
+  <h2>用語</h2>
+  <div class="tbl"><table>
+    <tr><th>用語</th><th>意味</th></tr>
+    <tr><td>hub リポジトリ</td><td>この仕組みそのもの。<code>hub</code> コマンド、この設計資料、Claude 向けのルール、導入手順が入っている。GitHub に置いて clone して使う</td></tr>
+    <tr><td>データリポジトリ</td><td>作業などのデータを置く場所。環境ごとにローカルへ作る。既定は <code>~/dev/data</code></td></tr>
+    <tr><td>作業</td><td>目的を1つ持つ仕事の単位。親子関係を持てる</td></tr>
+    <tr><td>作業場</td><td>ある作業のために、あるリポジトリから作ったブランチと、そのフォルダ</td></tr>
+    <tr><td>記録</td><td>作業から出た、人が見る HTML。種類は進捗・判断・調査・図解</td></tr>
+    <tr><td>ToDo</td><td>作業にする前のものを置く場所。作業にする、そのまま済ませる、捨てる、のどれかになる</td></tr>
+    <tr><td>承認ゲート</td><td>人の承認が要る操作を、1件ずつ登録したもの</td></tr>
+    <tr><td>リポジトリ</td><td>コードの入れ物。GitHub にあるものと、ローカルのみのものがある</td></tr>
+    <tr><td>未反映の変更</td><td>作業場にだけある変更。未コミットの変更と、元のブランチに入っていないコミットを指す</td></tr>
+    <tr><td>終了 / 片付け</td><td>終了は、作業の状態を変えること。片付けは、終了した作業の作業場と下書きを整理すること</td></tr>
+    <tr><td>確定 / 公開</td><td>確定は、記録を残すと決めること。公開は、確定した記録を claude.ai に出すこと</td></tr>
+    <tr><td>画面</td><td>人がデータを見るための表示。Claude Desktop のアーティファクトとして作る。自由に書き換えてよい</td></tr>
+  </table></div>
+</section>
+
 <section id="principles">
   <h2>考え方</h2>
   <p>この仕組みが守ることは8つです。データ定義もルールも、ここから出ています。</p>
   <div class="rules">
-    <div class="rule"><h3>主役は作業</h3><p>リポジトリもブランチも、作業の持ち物として扱います。全体の状況は、作業の一覧を見れば分かります。</p></div>
+    <div class="rule"><h3>主役は作業</h3><p>リポジトリもブランチも、作業に所属するものとして扱います。全体の状況は、作業の一覧を見れば分かります。</p></div>
     <div class="rule"><h3>データが原本、画面は表示</h3><p>画面は何度作り直しても構いません。使う人が自由に書き換えてよいものです。</p></div>
-    <div class="rule"><h3>書き換えの入口は1つ</h3><p>データを書き換えるのは <code>hub</code> コマンドだけです。Claude も MCP も、同じ入口を通ります。</p></div>
+    <div class="rule"><h3>書き換えは hub コマンド経由のみ</h3><p>データを書き換えるのは <code>hub</code> コマンドだけです。Claude も MCP も、このコマンドを通ります。</p></div>
     <div class="rule"><h3>作業は Claude、確認は人</h3><p>操作は Claude が行います。人が挟まるのは、やり直しがきかない操作だけです。</p></div>
-    <div class="rule"><h3>確かめられる値は保存しない</h3><p>Git に聞けば分かることは、聞くたびに確かめます。保存した値は、実際の状態とずれるからです。</p></div>
-    <div class="rule"><h3>登録の無いものはゴミ</h3><p>置き場を厳しく決める代わりに、すべてをデータに登録します。登録が無ければ消してよいものです。</p></div>
-    <div class="rule"><h3>欄は平らに保つ</h3><p>入れ子を作らず、複数あるものは別のデータにします。先回りした拡張は入れません。</p></div>
-    <div class="rule"><h3>仕組みとデータは別</h3><p>配るのは仕組みだけです。データは環境ごとに手元へ置き、混ぜません。</p></div>
+    <div class="rule"><h3>Git から分かる情報は保存しない</h3><p>Git から分かる情報は、必要なたびに取得します。保存した値は、実際の状態とずれるからです。</p></div>
+    <div class="rule"><h3>未登録のものは削除対象</h3><p>置き場を厳しく決める代わりに、すべてをデータに登録します。未登録のファイルやフォルダは、削除対象として扱います。</p></div>
+    <div class="rule"><h3>項目は入れ子にしない</h3><p>入れ子を作らず、複数あるものは別のデータにします。先回りした拡張は入れません。</p></div>
+    <div class="rule"><h3>仕組みとデータは別</h3><p>配るのは仕組みだけです。データは環境ごとにローカルへ置き、混ぜません。</p></div>
   </div>
 </section>
 
 <section id="overview">
   <h2>全体像</h2>
-  <p>作業は WSL の中で Claude Code が進めます。その状況はすべて「全体管理リポジトリ」にデータとして書かれます。人は Claude Desktop のアーティファクトだけを見て、アーティファクトはローカル MCP を通じてそのデータを読み書きします。</p>
+  <p>作業は WSL の中で Claude Code が進めます。その状況はすべて「データリポジトリ」にデータとして書かれます。人は Claude Desktop のアーティファクトだけを見て、アーティファクトはローカル MCP を通じてそのデータを読み書きします。</p>
   <div class="fig">
-    <svg viewBox="0 0 720 300" role="img" aria-label="人は Claude Desktop を見る。Claude Desktop はローカル MCP を通じて WSL 内の全体管理リポジトリを読み書きする。WSL 内では Claude Code が作業場を書き換え、全体管理リポジトリを更新する。">
+    <svg viewBox="0 0 720 300" role="img" aria-label="人は Claude Desktop を見る。Claude Desktop はローカル MCP を通じて WSL 内のデータリポジトリを読み書きする。WSL 内では Claude Code が作業場を書き換え、データリポジトリを更新する。">
       <defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
       <g class="n-rec"><rect x="40" y="24" width="180" height="58" rx="8"/><text class="t1" x="130" y="48" text-anchor="middle">あなた</text><text class="t2" x="130" y="68" text-anchor="middle">画面だけ見る</text></g>
       <g class="n-rec"><rect x="270" y="24" width="180" height="58" rx="8"/><text class="t1" x="360" y="48" text-anchor="middle">Claude Desktop</text><text class="t2" x="360" y="68" text-anchor="middle">アーティファクトを表示</text></g>
@@ -145,27 +165,27 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
       <text class="t1" x="44" y="150">WSL の中</text>
       <g class="n-place"><rect x="44" y="176" width="180" height="58" rx="8"/><text class="t1" x="134" y="200" text-anchor="middle">Claude Code</text><text class="t2" x="134" y="220" text-anchor="middle">並列で作業する</text></g>
       <g class="n-place"><rect x="270" y="176" width="180" height="58" rx="8"/><text class="t1" x="360" y="200" text-anchor="middle">作業場</text><text class="t2" x="360" y="220" text-anchor="middle">コードを書き換える場所</text></g>
-      <g class="n-task"><rect x="496" y="176" width="180" height="58" rx="8"/><text class="t1" x="586" y="200" text-anchor="middle">全体管理リポジトリ</text><text class="t2" x="586" y="220" text-anchor="middle">この資料が定義するデータ</text></g>
+      <g class="n-task"><rect x="496" y="176" width="180" height="58" rx="8"/><text class="t1" x="586" y="200" text-anchor="middle">データリポジトリ</text><text class="t2" x="586" y="220" text-anchor="middle">この資料が定義するデータ</text></g>
       <line class="ln" x1="224" y1="205" x2="266" y2="205" marker-end="url(#ah)"/>
       <path class="ln" d="M134 234 L134 258 L586 258 L586 238" marker-end="url(#ah)"/>
       <line class="ln" x1="590" y1="82" x2="590" y2="172" marker-end="url(#ah)"/>
     </svg>
   </div>
-  <p>この資料が扱うのは、図の青い箱の中身です。ここが正しく保たれていれば、表示側は何度作り直しても失うものがありません。</p>
+  <p>この資料が扱うのは、データリポジトリの中身です。ここが正しく保たれていれば、画面は何度作り直しても失うものがありません。</p>
 </section>
 
 <section id="model">
   <h2>6つのデータ</h2>
   <p>持つデータは6種類です。矢印は「持つ」または「指す」の向きで、どれも1件に対して複数がぶら下がります。</p>
   <div class="fig">
-    <svg viewBox="0 0 720 372" role="img" aria-label="ToDo は作業に昇格する。作業は親子関係を持ち、作業場、記録、承認ゲートを持つ。作業場はリポジトリを指す。">
+    <svg viewBox="0 0 720 372" role="img" aria-label="ToDo は作業になる。作業は親子関係を持ち、作業場、記録、承認ゲートを持つ。作業場はリポジトリを指す。">
       <g class="n-rec"><rect x="40" y="60" width="170" height="54" rx="8"/><text class="t1" x="125" y="83" text-anchor="middle">ToDo</text><text class="t2" x="125" y="102" text-anchor="middle">作業の種</text></g>
-      <g class="n-task"><rect x="275" y="60" width="170" height="54" rx="8"/><text class="t1" x="360" y="83" text-anchor="middle">作業</text><text class="t2" x="360" y="102" text-anchor="middle">目的を1つ持つ札</text></g>
+      <g class="n-task"><rect x="275" y="60" width="170" height="54" rx="8"/><text class="t1" x="360" y="83" text-anchor="middle">作業</text><text class="t2" x="360" y="102" text-anchor="middle">目的を1つ持つ単位</text></g>
       <line class="ln" x1="210" y1="87" x2="271" y2="87" marker-end="url(#ah)"/>
-      <text class="lbl" x="240" y="78" text-anchor="middle">昇格</text>
+      <text class="lbl" x="240" y="78" text-anchor="middle">作業にする</text>
       <path class="ln" d="M335 60 C322 20 398 20 386 56" marker-end="url(#ah)"/>
       <text class="lbl" x="410" y="30">親と子</text>
-      <g class="n-place"><rect x="40" y="190" width="170" height="54" rx="8"/><text class="t1" x="125" y="213" text-anchor="middle">作業場</text><text class="t2" x="125" y="232" text-anchor="middle">ブランチと作業フォルダ</text></g>
+      <g class="n-place"><rect x="40" y="190" width="170" height="54" rx="8"/><text class="t1" x="125" y="213" text-anchor="middle">作業場</text><text class="t2" x="125" y="232" text-anchor="middle">ブランチとそのフォルダ</text></g>
       <g class="n-rec"><rect x="275" y="190" width="170" height="54" rx="8"/><text class="t1" x="360" y="213" text-anchor="middle">記録</text><text class="t2" x="360" y="232" text-anchor="middle">人が見る HTML</text></g>
       <g class="n-gate"><rect x="510" y="190" width="170" height="54" rx="8"/><text class="t1" x="595" y="213" text-anchor="middle">承認ゲート</text><text class="t2" x="595" y="232" text-anchor="middle">人が承認する箇所</text></g>
       <line class="ln" x1="320" y1="114" x2="150" y2="186" marker-end="url(#ah)"/>
@@ -181,121 +201,121 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <span><span class="sw gate"></span>人の承認</span>
     <span><span class="sw rec"></span>その他</span>
   </div>
-  <p>「作業」は、ばらばらに生まれるブランチや HTML を束ねる札です。GitHub の Issue に近いものですが、1つのリポジトリに閉じず、複数のリポジトリと記録をまたいで束ねます。</p>
+  <p>「作業」は、ばらばらに生まれるブランチや HTML を束ねる単位です。GitHub の Issue に近いものですが、1つのリポジトリに閉じず、複数のリポジトリと記録をまたいで束ねます。</p>
 </section>
 
 <section id="fields">
-  <h2>欄の定義</h2>
-  <p>どのデータも、入れ子を持たない平らな欄だけで定義します。1件を1つのテキストファイルとして持ちます。</p>
+  <h2>項目の定義</h2>
+  <p>どのデータも、入れ子の無い項目だけで定義します。1件を1つのテキストファイルとして持ちます。</p>
 
   <div class="entity">
     <h3>作業 <span class="mono">task</span></h3>
     <div class="tbl"><table>
-      <tr><th>欄</th><th>意味</th><th>例</th></tr>
-      <tr><td class="f">id</td><td>作業の番号</td><td class="f">t-20261122-a3f</td></tr>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>作業の ID</td><td class="f">t-20261122-a3f</td></tr>
       <tr><td class="f">parent_id</td><td>親の作業。無ければ空</td><td class="f">t-20261120-9c1</td></tr>
       <tr><td class="f">title</td><td>名前</td><td>認証を共通化する</td></tr>
       <tr><td class="f">purpose</td><td>何のためにやるか</td><td>アプリごとに重複している認証処理を1つにまとめる</td></tr>
       <tr><td class="f">status</td><td>進行中 / 終了 / 片付け済み</td><td>進行中</td></tr>
       <tr><td class="f">absorbed_into</td><td>別の作業に吸収された場合、その吸収先</td><td>空</td></tr>
-      <tr><td class="f">created_at</td><td>起こした日時</td><td class="f">2026-11-22</td></tr>
-      <tr><td class="f">closed_at</td><td>終了にした日時</td><td>空</td></tr>
+      <tr><td class="f">created_at</td><td>作った日時</td><td class="f">2026-11-22</td></tr>
+      <tr><td class="f">closed_at</td><td>終了した日時</td><td>空</td></tr>
     </table></div>
   </div>
 
   <div class="entity">
     <h3>作業場 <span class="mono">workspace</span></h3>
     <div class="tbl"><table>
-      <tr><th>欄</th><th>意味</th><th>例</th></tr>
-      <tr><td class="f">id</td><td>作業場の番号</td><td class="f">w-20261122-71b</td></tr>
-      <tr><td class="f">task_id</td><td>持ち主の作業。必ず1つ</td><td class="f">t-20261122-a3f</td></tr>
-      <tr><td class="f">repo_id</td><td>どのリポジトリから切ったか</td><td class="f">PoC</td></tr>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>作業場の ID</td><td class="f">w-20261122-71b</td></tr>
+      <tr><td class="f">task_id</td><td>所属する作業。必ず1つ</td><td class="f">t-20261122-a3f</td></tr>
+      <tr><td class="f">repo_id</td><td>どのリポジトリから作ったか</td><td class="f">PoC</td></tr>
       <tr><td class="f">branch</td><td>ブランチ名</td><td class="f">auth-common</td></tr>
-      <tr><td class="f">base</td><td>どのブランチから切ったか。消してよいかの判定に使う</td><td class="f">main</td></tr>
-      <tr><td class="f">path</td><td>作業フォルダの場所</td><td class="f">~/dev/work/t-20261122-a3f/PoC</td></tr>
+      <tr><td class="f">base</td><td>どのブランチから作ったか。削除してよいかの判定に使う</td><td class="f">main</td></tr>
+      <tr><td class="f">path</td><td>フォルダの場所</td><td class="f">~/dev/work/t-20261122-a3f/PoC</td></tr>
     </table></div>
-    <p class="cap">「ここにしか無い変更が残っているか」は欄にしません。保存するとずれるので、見るたびに Git に問い合わせて確かめます。</p>
+    <p class="cap">「未反映の変更があるか」は項目にしません。保存するとずれるので、必要なたびに Git から取得します。</p>
   </div>
 
   <div class="entity">
     <h3>記録 <span class="mono">record</span></h3>
     <div class="tbl"><table>
-      <tr><th>欄</th><th>意味</th><th>例</th></tr>
-      <tr><td class="f">id</td><td>記録の番号</td><td class="f">r-20261122-e04</td></tr>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>記録の ID</td><td class="f">r-20261122-e04</td></tr>
       <tr><td class="f">task_id</td><td>どの作業から出たか</td><td class="f">t-20261122-a3f</td></tr>
-      <tr><td class="f">kind</td><td>現在地 / 判断 / 調査 / 図解</td><td>調査</td></tr>
+      <tr><td class="f">kind</td><td>進捗 / 判断 / 調査 / 図解</td><td>調査</td></tr>
       <tr><td class="f">title</td><td>名前</td><td>認証ライブラリの比較</td></tr>
       <tr><td class="f">file</td><td>HTML ファイルの場所</td><td class="f">tasks/t-20261122-a3f/auth-libs.html</td></tr>
-      <tr><td class="f">status</td><td>下書き / 確定 / 共有</td><td>下書き</td></tr>
-      <tr><td class="f">published_url</td><td>claude.ai に共有した場合の URL</td><td>空</td></tr>
+      <tr><td class="f">status</td><td>下書き / 確定 / 公開</td><td>下書き</td></tr>
+      <tr><td class="f">published_url</td><td>claude.ai に公開した場合の URL</td><td>空</td></tr>
     </table></div>
   </div>
 
   <div class="entity">
     <h3>リポジトリ <span class="mono">repo</span></h3>
     <div class="tbl"><table>
-      <tr><th>欄</th><th>意味</th><th>例</th></tr>
-      <tr><td class="f">id</td><td>リポジトリの呼び名</td><td class="f">PoC</td></tr>
-      <tr><td class="f">remote_url</td><td>GitHub の場所。空なら手元だけ(失ってよいもの)</td><td class="f">github.com/yatami0/PoC</td></tr>
-      <tr><td class="f">path</td><td>手元の場所</td><td class="f">~/dev/repos/PoC</td></tr>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>リポジトリの ID</td><td class="f">PoC</td></tr>
+      <tr><td class="f">remote_url</td><td>GitHub の場所。空ならローカルのみ(失ってよいもの)</td><td class="f">github.com/yatami0/PoC</td></tr>
+      <tr><td class="f">path</td><td>ローカルの場所</td><td class="f">~/dev/repos/PoC</td></tr>
     </table></div>
   </div>
 
   <div class="entity">
     <h3>ToDo <span class="mono">todo</span></h3>
     <div class="tbl"><table>
-      <tr><th>欄</th><th>意味</th><th>例</th></tr>
-      <tr><td class="f">id</td><td>ToDo の番号</td><td class="f">d-20261122-5aa</td></tr>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>ToDo の ID</td><td class="f">d-20261122-5aa</td></tr>
       <tr><td class="f">text</td><td>一言の内容</td><td>トークン更新の失敗時の挙動を確認する</td></tr>
       <tr><td class="f">day</td><td>やるつもりの日。空なら「いつか」</td><td class="f">2026-11-23</td></tr>
       <tr><td class="f">origin_task_id</td><td>どの作業の途中で出たか。無ければ空</td><td class="f">t-20261122-a3f</td></tr>
-      <tr><td class="f">status</td><td>未着手 / 作業にした / 完了 / 捨てた</td><td>未着手</td></tr>
-      <tr><td class="f">promoted_to</td><td>作業にした場合、その作業</td><td>空</td></tr>
+      <tr><td class="f">status</td><td>未着手 / 作業化済み / 完了 / 捨てた</td><td>未着手</td></tr>
+      <tr><td class="f">promoted_to</td><td>作業化済み場合、その作業</td><td>空</td></tr>
     </table></div>
   </div>
 
   <div class="entity">
     <h3>承認ゲート <span class="mono">gate</span> <span class="tag prop">提案</span></h3>
     <div class="tbl"><table>
-      <tr><th>欄</th><th>意味</th><th>例</th></tr>
-      <tr><td class="f">id</td><td>ゲートの番号</td><td class="f">g-20261122-b12</td></tr>
-      <tr><td class="f">task_id</td><td>どの作業のゲートか</td><td class="f">t-20261122-a3f</td></tr>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>承認ゲートの ID</td><td class="f">g-20261122-b12</td></tr>
+      <tr><td class="f">task_id</td><td>どの作業の承認ゲートか</td><td class="f">t-20261122-a3f</td></tr>
       <tr><td class="f">action</td><td>何をする前の承認か</td><td>push</td></tr>
       <tr><td class="f">target</td><td>対象</td><td class="f">PoC / auth-common</td></tr>
-      <tr><td class="f">status</td><td>未承認 / 承認済み</td><td>未承認</td></tr>
+      <tr><td class="f">status</td><td>承認待ち / 承認済み</td><td>承認待ち</td></tr>
     </table></div>
-    <p class="cap">会話では「作業に承認ゲートの一覧を持たせる」としていましたが、欄を平らに保つために、独立したデータに分けています。</p>
+    <p class="cap">会話では「作業に承認ゲートの一覧を持たせる」としていましたが、入れ子を避けるために、独立したデータに分けています。</p>
   </div>
 </section>
 
 <section id="states">
   <h2>状態</h2>
-  <p>状態を持つのは4つです。破線の丸は、そこで役目を終える状態です。</p>
+  <p>状態を持つのは4つです。破線は最終状態を表します。</p>
   <div class="states">
     <div class="flow"><span class="who">作業</span><span class="chip">進行中</span><span class="arrow">→</span><span class="chip">終了</span><span class="arrow">→</span><span class="chip end">片付け済み</span></div>
-    <div class="flow"><span class="who">記録</span><span class="chip">下書き</span><span class="arrow">→</span><span class="chip">確定</span><span class="arrow">→</span><span class="chip end">共有</span></div>
-    <div class="flow"><span class="who">ToDo</span><span class="chip">未着手</span><span class="arrow">→</span><span class="chip end">作業にした</span><span class="arrow">/</span><span class="chip end">完了</span><span class="arrow">/</span><span class="chip end">捨てた</span></div>
-    <div class="flow"><span class="who">承認ゲート</span><span class="chip">未承認</span><span class="arrow">→</span><span class="chip end">承認済み</span></div>
+    <div class="flow"><span class="who">記録</span><span class="chip">下書き</span><span class="arrow">→</span><span class="chip">確定</span><span class="arrow">→</span><span class="chip end">公開</span></div>
+    <div class="flow"><span class="who">ToDo</span><span class="chip">未着手</span><span class="arrow">→</span><span class="chip end">作業化済み</span><span class="arrow">/</span><span class="chip end">完了</span><span class="arrow">/</span><span class="chip end">捨てた</span></div>
+    <div class="flow"><span class="who">承認ゲート</span><span class="chip">承認待ち</span><span class="arrow">→</span><span class="chip end">承認済み</span></div>
   </div>
   <div class="tbl"><table>
     <tr><th>記録の状態</th><th>置き場</th><th>失ったら</th></tr>
-    <tr><td>下書き</td><td>手元に置くだけ</td><td>諦める</td></tr>
+    <tr><td>下書き</td><td>ローカルに置くだけ</td><td>諦める</td></tr>
     <tr><td>確定</td><td>残すと決めたもの。データ用のリモートをつないだ環境では push する</td><td>リモートをつないでいれば戻せる</td></tr>
-    <tr><td>共有</td><td>claude.ai にも出す</td><td>—</td></tr>
+    <tr><td>公開</td><td>claude.ai にも出す</td><td>—</td></tr>
   </table></div>
 </section>
 
 <section id="rules">
   <h2>ルール</h2>
   <div class="rules">
-    <div class="rule"><h3>親と子は同じもの</h3><p>親も子も同じ「作業」です。違いは <code>parent_id</code> に値があるかどうかだけです。子を独立させるときは、この欄を空にします。</p></div>
-    <div class="rule"><h3>作業場の持ち主は1つ</h3><p>作業場は、それを切った作業だけが持ちます。作業が持つ作業場は0個でも複数でも構いません。読むだけなら作業場は要りません。</p></div>
-    <div class="rule"><h3>子が残る親は閉じられない</h3><p>親を閉じる前に、子を1つずつ「終わらせる」「別の作業に吸収させる」「親から切り離す」のどれかにします。</p></div>
-    <div class="rule"><h3>閉じると片付けるは別</h3><p>閉じるのは状態を変えるだけです。作業場を消すのは、ここにしか無い変更が無いと Git で確かめてからです。</p></div>
+    <div class="rule"><h3>親と子は同じもの</h3><p>親も子も同じ「作業」です。違いは <code>parent_id</code> に値があるかどうかだけです。子を独立させるときは、この項目を空にします。</p></div>
+    <div class="rule"><h3>作業場は1つの作業に所属する</h3><p>作業場は、それを作った作業に所属します。作業が持つ作業場は0個でも複数でも構いません。読むだけなら作業場は要りません。</p></div>
+    <div class="rule"><h3>子が進行中の親は終了できない</h3><p>子の作業が進行中のあいだ、親の作業は終了できません。先に、子を1つずつ「終了する」「別の作業に吸収させる」「親から切り離す」のどれかにします。</p></div>
+    <div class="rule"><h3>終了と片付けは別の操作</h3><p>終了は状態を変えるだけです。作業場を削除するのは、未反映の変更が無いと Git で確かめてからです。</p></div>
     <div class="rule"><h3>自分の作業しか書かない</h3><p>各セッションは、自分が担当する作業の配下だけを書き換え、自分が触ったファイルだけをコミットします。</p></div>
-    <div class="rule"><h3>共有の一覧は保存しない</h3><p>作業の一覧や ToDo の一覧は、ファイルとして持ちません。表示のたびに1件ずつのファイルから組み立てます。</p></div>
-    <div class="rule"><h3>登録の無いものはゴミ</h3><p>作業場も記録も、必ずデータに登録します。登録されていないフォルダは、消してよいものとして機械的に見つけられます。</p></div>
-    <div class="rule"><h3>ToDo は作業の手前の受け皿</h3><p>ToDo は作業ではありません。作業にすると決めたときに、初めて作業が1件起きます。作業は ToDo を経由しなくても起こせます。</p></div>
+    <div class="rule"><h3>一覧のファイルは保存しない</h3><p>作業の一覧や ToDo の一覧は、ファイルとして持ちません。表示のたびに1件ずつのファイルから組み立てます。</p></div>
+    <div class="rule"><h3>未登録のものは削除対象</h3><p>作業場も記録も、必ずデータに登録します。未登録のフォルダは、削除対象として機械的に見つけられます。</p></div>
+    <div class="rule"><h3>ToDo は作業にする前の置き場</h3><p>ToDo は作業ではありません。作業にすると決めたときに、初めて作業が1件できます。作業は ToDo を経由しなくても作れます。</p></div>
   </div>
 
   <h3>親子の例</h3>
@@ -319,28 +339,28 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="roles">
   <h2>Claude と人の分担</h2>
-  <p>操作は基本的にすべて Claude が行います。人が挟まるのは、やり直しがきかない操作だけです。その箇所は、作業を起こす時点で承認ゲートとして登録され、画面に「承認待ち」として並びます。</p>
+  <p>操作は基本的にすべて Claude が行います。人が挟まるのは、やり直しがきかない操作だけです。その箇所は、作業を作る時点で承認ゲートとして登録され、画面に「承認待ち」として並びます。</p>
   <div class="tbl"><table>
     <tr><th>Claude が自分でやる</th><th>人が承認する</th></tr>
-    <tr><td>作業を起こす、子に分ける、閉じる</td><td>リモートへの push</td></tr>
-    <tr><td>作業場を切る</td><td>記録を「確定」に上げる(push を伴う)</td></tr>
-    <tr><td>記録を書く、手元でコミットする</td><td>claude.ai への共有</td></tr>
-    <tr><td>ToDo を足す、状態を変える</td><td>中身が残っている作業場を消す</td></tr>
-    <tr><td>中身が空だと確かめられた作業場を消す</td><td>GitHub のリポジトリやブランチを作る・消す</td></tr>
+    <tr><td>作業を作る、子に分ける、終了する</td><td>リモートへの push</td></tr>
+    <tr><td>作業場を作る</td><td>記録を確定する</td></tr>
+    <tr><td>記録を書く、ローカルでコミットする</td><td>claude.ai への公開</td></tr>
+    <tr><td>ToDo を足す、状態を変える</td><td>未反映の変更がある作業場を削除する</td></tr>
+    <tr><td>未反映の変更が無いと確かめられた作業場を削除する</td><td>GitHub のリポジトリやブランチを作る・削除する</td></tr>
   </table></div>
   <p>書き手は3者います。裏で動く Claude Code、Claude Desktop 経由の MCP、そして直接ファイルを開くあなたです。データの形を崩さないために、書き換えは共通のコマンド群を通して行います。<span class="tag prop">提案</span></p>
 </section>
 
 <section id="cycle">
   <h2>回し方</h2>
-  <p>流れは2つあり、別々に回ります。中心は作業の流れで、いつでも起こせて、いくつでも並列に進みます。ToDo の流れは、その手前にある受け皿です。2つがつながるのは、作業の途中で ToDo が出るときと、ToDo を作業にするときの2か所だけです。</p>
+  <p>流れは2つあり、別々に回ります。中心は作業の流れで、いつでも作れて、いくつでも並列に進みます。ToDo の流れは、作業にする前のものを置く場所です。2つがつながるのは、作業の途中で ToDo が出るときと、ToDo を作業にするときの2か所だけです。</p>
   <div class="fig">
-    <svg viewBox="0 0 720 250" role="img" aria-label="作業の流れは、起こす、進める、承認に答える、閉じる、片付けるの順に進む。ToDo の流れは、残す、仕分けるの順に進む。作業を進める途中で引っかかりが ToDo に残り、仕分けで作業にすると決めたものが作業として起こされる。">
-      <text class="lbl" x="24" y="18">作業の流れ / いつでも起こせる。いくつでも並列に進む</text>
-      <g class="n-task"><rect x="24" y="34" width="120" height="54" rx="8"/><text class="t1" x="84" y="57" text-anchor="middle">起こす</text><text class="t2" x="84" y="76" text-anchor="middle">人 か Claude</text></g>
+    <svg viewBox="0 0 720 250" role="img" aria-label="作業の流れは、作る、進める、承認に答える、終了する、片付けるの順に進む。ToDo の流れは、残す、仕分けるの順に進む。作業を進める途中で引っかかりが ToDo に残り、仕分けで作業にすると決めたものが作業として作られる。">
+      <text class="lbl" x="24" y="18">作業の流れ / いつでも作れる。いくつでも並列に進む</text>
+      <g class="n-task"><rect x="24" y="34" width="120" height="54" rx="8"/><text class="t1" x="84" y="57" text-anchor="middle">作る</text><text class="t2" x="84" y="76" text-anchor="middle">人 か Claude</text></g>
       <g class="n-place"><rect x="174" y="34" width="120" height="54" rx="8"/><text class="t1" x="234" y="57" text-anchor="middle">進める</text><text class="t2" x="234" y="76" text-anchor="middle">Claude</text></g>
       <g class="n-gate"><rect x="324" y="34" width="140" height="54" rx="8"/><text class="t1" x="394" y="57" text-anchor="middle">承認に答える</text><text class="t2" x="394" y="76" text-anchor="middle">人 / 必要なときだけ</text></g>
-      <g class="n-place"><rect x="494" y="34" width="90" height="54" rx="8"/><text class="t1" x="539" y="57" text-anchor="middle">閉じる</text><text class="t2" x="539" y="76" text-anchor="middle">Claude</text></g>
+      <g class="n-place"><rect x="494" y="34" width="90" height="54" rx="8"/><text class="t1" x="539" y="57" text-anchor="middle">終了する</text><text class="t2" x="539" y="76" text-anchor="middle">Claude</text></g>
       <g class="n-place"><rect x="614" y="34" width="90" height="54" rx="8"/><text class="t1" x="659" y="57" text-anchor="middle">片付ける</text><text class="t2" x="659" y="76" text-anchor="middle">Claude</text></g>
       <line class="ln" x1="144" y1="61" x2="170" y2="61" marker-end="url(#ah)"/>
       <line class="ln" x1="294" y1="61" x2="320" y2="61" marker-end="url(#ah)"/>
@@ -357,14 +377,14 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
       <text class="lbl" x="324" y="204">作業にしないものは、そのまま済ませるか捨てる</text>
     </svg>
   </div>
-  <p>作業は ToDo を経由しなくても起こせます。「これをやって」と頼めば、その場で作業が1件起きます。ToDo は、いますぐ作業にするほどではないものを取っておく場所です。</p>
+  <p>作業は ToDo を経由しなくても作れます。「これをやって」と頼めば、その場で作業が1件できます。ToDo は、いますぐ作業にするほどではないものを取っておく場所です。</p>
   <div class="tbl"><table>
     <tr><th>場面</th><th>きっかけ</th><th>やること</th></tr>
-    <tr><td>作業を起こす</td><td>人が頼んだとき。または ToDo を作業にすると決めたとき</td><td>目的を書き、必要になる承認をゲートとして登録する</td></tr>
-    <tr><td>作業を進める</td><td>作業が進行中のあいだ</td><td>作業場を切る。記録を書く。大きくなったら子に分ける。引っかかりは ToDo に残す</td></tr>
-    <tr><td>承認に答える</td><td>承認待ちが出たとき</td><td>人がゲートを承認する。承認されるまで、その操作は止まる</td></tr>
-    <tr><td>閉じる</td><td>目的を果たした、吸収された、やめた、のどれか</td><td>子を先に整理する。その作業から出た ToDo を仕分ける</td></tr>
-    <tr><td>片付ける</td><td>作業を閉じたあと</td><td>作業場を1つずつ確かめて消す。下書きは確定に上げるか捨てる。全部済むと「片付け済み」になる</td></tr>
+    <tr><td>作業を作る</td><td>人が頼んだとき。または ToDo を作業にすると決めたとき</td><td>目的を書き、必要になる承認を承認ゲートとして登録する</td></tr>
+    <tr><td>作業を進める</td><td>作業が進行中のあいだ</td><td>作業場を作る。記録を書く。大きくなったら子に分ける。引っかかりは ToDo に残す</td></tr>
+    <tr><td>承認に答える</td><td>承認待ちが出たとき</td><td>人が承認ゲートを承認する。承認されるまで、その操作は止まる</td></tr>
+    <tr><td>終了する</td><td>目的を果たした、吸収された、やめた、のどれか</td><td>子を先に整理する。その作業から出た ToDo を仕分ける</td></tr>
+    <tr><td>片付ける</td><td>作業を終了したあと</td><td>作業場を1つずつ確かめて削除する。下書きは確定するか捨てる。全部済むと「片付け済み」になる</td></tr>
   </table></div>
   <div class="tbl"><table>
     <tr><th>ToDo の場面</th><th>きっかけ</th><th>やること</th></tr>
@@ -375,23 +395,23 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="layout">
   <h2>フォルダ配置</h2>
-  <p>仕組みとデータは別々に持ちます。GitHub に置いて配るのは仕組みだけで、データは環境ごとに手元へ置きます。同じ仕組みを、プライベートでも社用でも clone して使えます。</p>
+  <p>仕組みとデータは別々に持ちます。GitHub に置いて配るのは仕組みだけで、データは環境ごとにローカルへ置きます。同じ仕組みを、プライベートでも社用でも clone して使えます。</p>
   <div class="tbl"><table>
     <tr><th></th><th>仕組み</th><th>データ</th></tr>
-    <tr><td>中身</td><td><code>hub</code> コマンド、この設計資料、Claude 向けの決まり、導入手順</td><td>作業、作業場、記録、ToDo、承認ゲート、リポジトリの登録</td></tr>
-    <tr><td>置き場</td><td><code>~/dev/hub</code>(clone したもの)</td><td><code>~/dev/data</code>(全体管理リポジトリ)</td></tr>
+    <tr><td>中身</td><td><code>hub</code> コマンド、この設計資料、Claude 向けのルール、導入手順</td><td>作業、作業場、記録、ToDo、承認ゲート、リポジトリの登録</td></tr>
+    <tr><td>置き場</td><td><code>~/dev/hub</code>(clone したもの)</td><td><code>~/dev/data</code>(データリポジトリ)</td></tr>
     <tr><td>環境をまたいで</td><td>同じものを使う</td><td>混ぜない</td></tr>
   </table></div>
-  <p>場所はデータの <code>path</code> と <code>file</code> が知っているので、フォルダの規約で厳しく縛る必要はありません。固定するのは、全体管理リポジトリの場所だけです。下は既定の配置です。</p>
+  <p>場所はデータの <code>path</code> と <code>file</code> が知っているので、フォルダの規約で厳しく縛る必要はありません。固定するのは、データリポジトリの場所だけです。下は既定の配置です。</p>
 <pre>~/dev/
   hub/                          <span class="c">仕組み(このリポジトリを clone したもの)</span>
-  data/                         <span class="c">全体管理リポジトリ(データ。ここだけ固定)</span>
+  data/                         <span class="c">データリポジトリ(データ。ここだけ固定)</span>
     tasks/&lt;作業ID&gt;/              <span class="c">作業1件のデータと、その記録の HTML</span>
     todos/                      <span class="c">ToDo(1件1ファイル)</span>
     repos/                      <span class="c">リポジトリの登録情報</span>
   repos/&lt;リポジトリ名&gt;/           <span class="c">コードの本体(ここでは直接作業しない)</span>
   work/&lt;作業ID&gt;/&lt;リポジトリ名&gt;/   <span class="c">作業場</span></pre>
-  <p>作業場は、リポジトリの下ではなく作業の下に置きます。人が追うときは、作業の番号を1つ知っていれば、<code>data/tasks/</code> で経緯が、<code>work/</code> でコードが見つかります。</p>
+  <p>作業場は、リポジトリの下ではなく作業の下に置きます。人が追うときは、作業の IDを1つ知っていれば、<code>data/tasks/</code> で経緯が、<code>work/</code> でコードが見つかります。</p>
 </section>
 
 <section id="fixed">
@@ -399,27 +419,27 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <p>この仕組みが約束するのは、データの形と回し方です。それ以外は、使う人が書き換えて構いません。</p>
   <div class="tbl"><table>
     <tr><th>固定する</th><th>自由にしてよい</th></tr>
-    <tr><td>6つのデータと、その欄・状態の値</td><td>画面(全体・個別作業・ToDo)の見た目と作り</td></tr>
-    <tr><td>ルール(親子、持ち主、閉じると片付ける、承認)</td><td>コードのリポジトリと作業場の置き場</td></tr>
-    <tr><td>書き換えの入口が <code>hub</code> コマンドだけであること</td><td>Claude 向けの決まりの言い回し</td></tr>
+    <tr><td>6つのデータと、その項目・状態の値</td><td>画面(全体・個別作業・ToDo)の見た目と作り</td></tr>
+    <tr><td>ルール(親子、所属、終了と片付け、承認)</td><td>コードのリポジトリと作業場の置き場</td></tr>
+    <tr><td>書き換えが <code>hub</code> コマンド経由だけであること</td><td>Claude 向けのルールの言い回し</td></tr>
     <tr><td>コマンドの名前と、<code>--json</code> で返す形</td><td>仕分けの頻度や、1日の進め方</td></tr>
   </table></div>
   <p>画面と MCP は、<code>hub</code> コマンドを呼ぶだけの薄い層にします。コマンドと返す形が変わらなければ、画面をどう書き換えても壊れません。</p>
 
-  <h3>欄を変えるときの決まり <span class="tag prop">提案</span></h3>
+  <h3>項目を変えるときのルール <span class="tag prop">提案</span></h3>
   <ul>
-    <li>欄を足すだけなら、版の番号は変えません。古いファイルは、その欄が空のものとして読みます。</li>
-    <li>欄の意味を変える、欄を消す、状態の値を変えるときは、版の番号を上げ、古いファイルを直すコマンドを一緒に用意します。</li>
+    <li>項目を足すだけなら、スキーマのバージョンは変えません。古いファイルは、その項目が空のものとして読みます。</li>
+    <li>項目の意味を変える、項目を削除する、状態の値を変えるときは、スキーマのバージョンを上げ、古いファイルを直すコマンドを一緒に用意します。</li>
   </ul>
 
   <h3>作る前に固めた4点</h3>
-  <p>データ定義は、あとから変えにくい部分です。欄を平らに保つ方針はそのままにして、次の4点を先に決めました。</p>
+  <p>データ定義は、あとから変えにくい部分です。項目を入れ子にしない方針はそのままにして、次の4点を先に決めました。</p>
   <div class="tbl"><table>
     <tr><th>項目</th><th>案</th><th>理由</th></tr>
-    <tr><td>番号の付け方 <span class="tag prop">提案</span></td><td>種類の頭文字 + 日付 + 短い乱数(例 <code>t-20261122-a3f</code>)</td><td>連番にすると、並列で同時に起こしたときに同じ番号が付く</td></tr>
-    <tr><td>版の番号 <span class="tag prop">提案</span></td><td>すべてのファイルに <code>schema: 1</code> を入れる</td><td>将来欄を変えたとき、古い形のファイルを見分けて直せる</td></tr>
-    <tr><td>状態の値</td><td>この資料の「状態」に挙げた値だけを使う</td><td>自由に書けると、表示側が集計できなくなる</td></tr>
-    <tr><td>平らな欄</td><td>欄の中に入れ子や一覧を持たせない。複数あるものは別のデータにする</td><td>入れ子は、並列で書いたときにぶつかりやすく、後から形を変えにくい</td></tr>
+    <tr><td>ID の付け方 <span class="tag prop">提案</span></td><td>種類の頭文字 + 日付 + 短い乱数(例 <code>t-20261122-a3f</code>)</td><td>連番にすると、並列で同時に作ったときに同じ ID が付く</td></tr>
+    <tr><td>スキーマのバージョン <span class="tag prop">提案</span></td><td>すべてのファイルに <code>schema: 1</code> を入れる</td><td>将来項目を変えたとき、古い形のファイルを見分けて直せる</td></tr>
+    <tr><td>状態の値</td><td>この資料の「状態」に挙げた値だけを使う</td><td>自由に書けると、画面が集計できなくなる</td></tr>
+    <tr><td>入れ子にしない</td><td>項目の中に入れ子や一覧を持たせない。複数あるものは別のデータにする</td><td>入れ子は、並列で書いたときにぶつかりやすく、後から形を変えにくい</td></tr>
   </table></div>
 </section>
 
@@ -429,18 +449,18 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <ul>
     <li>アーティファクトから、ローカル MCP の書き込みを呼べるか。</li>
     <li>Windows 側の Claude Desktop から、WSL の中の MCP に届くか。</li>
-    <li>アーティファクトから Claude のセッションを起こせるか。別の道として、MCP から WSL 側の Claude Code を起動する形があります。</li>
+    <li>アーティファクトから Claude のセッションを作れるか。別の道として、MCP から WSL 側の Claude Code を起動する形があります。</li>
     <li>承認を強制する設定の正確な書き方。</li>
   </ul>
   <h3>後回しにしたこと</h3>
   <ul>
-    <li>データを別のマシンへ持ち出すこと。必要になったら、データの入れ物を自分の非公開リポジトリへ push すれば足ります。</li>
+    <li>データを別のマシンへ持ち出すこと。必要になったら、データリポジトリを自分の非公開リポジトリへ push すれば足ります。</li>
     <li>サブ PC からの接続。</li>
-    <li>リポジトリ固有の判断を、そのリポジトリの中に置くかどうか。いまはすべて全体管理リポジトリに集めます。</li>
+    <li>リポジトリ固有の判断を、そのリポジトリの中に置くかどうか。いまはすべてデータリポジトリに集めます。</li>
   </ul>
   <h3>作る順番</h3>
   <ol>
-    <li>全体管理リポジトリと、データを書き換える共通のコマンド群を作る。(済み)</li>
+    <li>データリポジトリと、データを書き換える共通のコマンド群を作る。(済み)</li>
     <li>アーティファクトとローカル MCP がつながるかを小さく試す。</li>
     <li>MCP を作る。中身は 1 のコマンド群を呼ぶだけにする。</li>
     <li>全体作業・個別作業・ToDo の3つの画面を作る。</li>

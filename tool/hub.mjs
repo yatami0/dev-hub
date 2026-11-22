@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // hub: 作業データを書き換える唯一の入口。
 // このリポジトリは「仕組み」だけを持つ。データは HUB_ROOT(既定 ~/dev)/data に環境ごとに置く。
-// 定義は design.html が原本。1件1ファイルの JSON、欄は平ら、状態の値は下の定数だけ。
+// 定義は design.html が原本。1件1ファイルの JSON、項目は入れ子にしない、状態の値は下の定数だけ。
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
@@ -9,17 +9,17 @@ import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 
 const ROOT = process.env.HUB_ROOT || path.join(os.homedir(), 'dev');
-const HUB = path.join(ROOT, 'data'); // データの入れ物。仕組み(このリポジトリ)とは別に、環境ごとに持つ
+const HUB = path.join(ROOT, 'data'); // データリポジトリ。仕組み(このリポジトリ)とは別に、環境ごとに持つ
 const KIT = path.dirname(path.dirname(fs.realpathSync(process.argv[1])));
 const WORK = path.join(ROOT, 'work');
 const SCHEMA = 1;
 
 const TASK = { active: '進行中', closed: '終了', tidied: '片付け済み' };
-const REC = { draft: '下書き', confirmed: '確定', shared: '共有' };
-const KINDS = ['現在地', '判断', '調査', '図解'];
-const TODO = { open: '未着手', promoted: '作業にした', done: '完了', dropped: '捨てた' };
-const GATE = { pending: '未承認', approved: '承認済み' };
-const ACTIONS = ['push', '確定', '共有', '作業場の強制削除', 'リモートの作成・削除'];
+const REC = { draft: '下書き', confirmed: '確定', shared: '公開' };
+const KINDS = ['進捗', '判断', '調査', '図解'];
+const TODO = { open: '未着手', promoted: '作業化済み', done: '完了', dropped: '捨てた' };
+const GATE = { pending: '承認待ち', approved: '承認済み' };
+const ACTIONS = ['push', '確定', '公開', '作業場の強制削除', 'リモートの作成・削除'];
 
 // ---------- 小道具 ----------
 const fail = (msg) => { console.error(`エラー: ${msg}`); process.exit(1); };
@@ -57,7 +57,7 @@ function git(cwd, ...args) {
 }
 const gitOk = (cwd, ...args) => { try { git(cwd, ...args); return true; } catch { return false; } };
 
-// 自分が触ったファイルだけを手元でコミットする。ぶつかったら後から来た側がやり直す。
+// 自分が触ったファイルだけをローカルでコミットする。ぶつかったら後から来た側がやり直す。
 function commit(files, msg) {
   if (!fs.existsSync(path.join(HUB, '.git'))) return;
   const rel = files.map((f) => path.relative(HUB, f));
@@ -127,7 +127,7 @@ function taskFromCwd() {
 const taskArg = (opt) => (typeof opt.task === 'string' ? opt.task : taskFromCwd() || fail('--task が必要です(作業場の外にいます)'));
 
 // ---------- 判定 ----------
-// 「ここにしか無いもの」が残っているかは保存せず、毎回 Git に聞く。
+// 未反映の変更があるかは保存せず、毎回 Git に聞く。
 function wsCheck(w) {
   if (!fs.existsSync(w.path)) return { exists: false, uncommitted: 0, ahead: 0, clean: true };
   const uncommitted = git(w.path, 'status', '--porcelain').split('\n').filter(Boolean).length;
@@ -136,7 +136,7 @@ function wsCheck(w) {
   return { exists: true, uncommitted, ahead, clean: uncommitted === 0 && ahead === 0 };
 }
 
-// 承認済みのゲートが無ければ、未承認のゲートを起こして止まる。
+// 承認済みの承認ゲートが無ければ、承認待ちの承認ゲートを作って止まる。
 function requireGate(taskId, action, target) {
   const gates = gateOf(taskId).filter((g) => g.action === action && g.target === target);
   if (gates.some((g) => g.status === GATE.approved)) return;
@@ -172,16 +172,16 @@ function link(src, dest) {
 }
 
 const cmd = {
-  // clone した先で1回だけ実行する。データの入れ物を作り、コマンドと決まりをつなぐ。
+  // clone した先で1回だけ実行する。データリポジトリを作り、コマンドとルールをつなぐ。
   init({ opt }) {
     fs.mkdirSync(HUB, { recursive: true });
     if (!fs.existsSync(path.join(HUB, '.git'))) {
       git(HUB, 'init', '-q', '-b', 'main');
       fs.writeFileSync(path.join(HUB, '.gitignore'), '*.tmp\n');
       git(HUB, 'add', '.gitignore');
-      git(HUB, 'commit', '-q', '-m', 'データの入れ物を開始');
-      console.log(`データの入れ物を作りました: ${HUB}`);
-    } else console.log(`データの入れ物は既にあります: ${HUB}`);
+      git(HUB, 'commit', '-q', '-m', 'データリポジトリを開始');
+      console.log(`データリポジトリを作りました: ${HUB}`);
+    } else console.log(`データリポジトリは既にあります: ${HUB}`);
     for (const d of ['repos', 'work']) fs.mkdirSync(path.join(ROOT, d), { recursive: true });
     link(path.join(KIT, 'CLAUDE.md'), path.join(ROOT, 'CLAUDE.md'));
     link(path.join(KIT, 'tool', 'hub.mjs'), path.join(os.homedir(), '.local', 'bin', 'hub'));
@@ -228,9 +228,9 @@ const cmd = {
     if (t.parent_id) console.log(`  親: ${t.parent_id}`);
     if (t.absorbed_into) console.log(`  吸収先: ${t.absorbed_into}`);
     data.children.forEach((c) => console.log(`  子: ${c.id} [${c.status}] ${c.title}`));
-    data.workspaces.forEach((w) => console.log(`  作業場: ${w.id} ${w.repo_id}/${w.branch} → ${w.check.exists ? (w.check.clean ? '消してよい' : `残りあり(未コミット ${w.check.uncommitted} / 未取り込み ${w.check.ahead})`) : '実体なし'}`));
+    data.workspaces.forEach((w) => console.log(`  作業場: ${w.id} ${w.repo_id}/${w.branch} → ${w.check.exists ? (w.check.clean ? '削除してよい' : `未反映あり(未コミット ${w.check.uncommitted} / 未取り込み ${w.check.ahead})`) : '実体なし'}`));
     data.records.forEach((r) => console.log(`  記録: ${r.id} [${r.status}] ${r.kind} ${r.title}`));
-    data.gates.forEach((g) => console.log(`  ゲート: ${g.id} [${g.status}] ${g.action} / ${g.target}`));
+    data.gates.forEach((g) => console.log(`  承認ゲート: ${g.id} [${g.status}] ${g.action} / ${g.target}`));
     data.todos.filter((d) => d.status === TODO.open).forEach((d) => console.log(`  ToDo: ${d.id} ${d.text}`));
   },
   'task close'({ pos, opt }) {
@@ -250,7 +250,7 @@ const cmd = {
     tidyIfDone(t.id);
   },
   'task detach'({ pos }) {
-    const t = getTask(pos[0] || fail('作業の番号が必要です'));
+    const t = getTask(pos[0] || fail('作業の IDが必要です'));
     t.parent_id = '';
     writeJson(P.task(t.id), t);
     commit([P.task(t.id)], `task: ${t.id} 親から切り離し`);
@@ -258,24 +258,24 @@ const cmd = {
   },
 
   'repo add'({ pos, opt }) {
-    const id = pos[0] || fail('リポジトリの呼び名が必要です');
+    const id = pos[0] || fail('リポジトリのIDが必要です');
     const p = expand(need(opt, 'path'));
     if (!gitOk(p, 'rev-parse', '--git-dir')) fail(`${p} は Git リポジトリではありません`);
     let remote = typeof opt.remote === 'string' ? opt.remote : '';
     if (!remote) { try { remote = git(p, 'remote', 'get-url', 'origin'); } catch { remote = ''; } }
     writeJson(P.repo(id), { schema: SCHEMA, id, remote_url: remote, path: p });
     commit([P.repo(id)], `repo: ${id}`);
-    console.log(`${id} を登録しました(${remote ? 'リモートあり' : '手元だけ'})`);
+    console.log(`${id} を登録しました(${remote ? 'リモートあり' : 'ローカルのみ'})`);
   },
   'repo list'({ opt }) {
     const rs = listJson(path.join(HUB, 'repos'));
     if (opt.json) return console.log(JSON.stringify(rs, null, 2));
-    rs.forEach((r) => console.log(`${r.id}  ${r.remote_url || '(手元だけ)'}  ${r.path}`));
+    rs.forEach((r) => console.log(`${r.id}  ${r.remote_url || '(ローカルのみ)'}  ${r.path}`));
   },
 
   'ws new'({ opt }) {
     const t = getTask(taskArg(opt));
-    if (t.status !== TASK.active) fail(`作業 ${t.id} は ${t.status} なので作業場を切れません`);
+    if (t.status !== TASK.active) fail(`作業 ${t.id} は ${t.status} なので作業場を作れません`);
     const r = getRepo(need(opt, 'repo'));
     const branch = need(opt, 'branch');
     const base = typeof opt.base === 'string' ? opt.base : git(r.path, 'symbolic-ref', '--short', 'HEAD');
@@ -292,13 +292,13 @@ const cmd = {
     const tasks = typeof opt.task === 'string' ? [getTask(opt.task)] : allTasks();
     const rows = tasks.flatMap((t) => wsOf(t.id).map((w) => ({ ...w, task_status: t.status, check: wsCheck(w) })));
     if (opt.json) return console.log(JSON.stringify(rows, null, 2));
-    rows.forEach((w) => console.log(`${w.id}  ${w.task_id}[${w.task_status}]  ${w.repo_id}/${w.branch}  ${w.check.exists ? (w.check.clean ? '消してよい' : `残りあり(未コミット ${w.check.uncommitted} / 未取り込み ${w.check.ahead})`) : '実体なし'}`));
+    rows.forEach((w) => console.log(`${w.id}  ${w.task_id}[${w.task_status}]  ${w.repo_id}/${w.branch}  ${w.check.exists ? (w.check.clean ? '削除してよい' : `未反映あり(未コミット ${w.check.uncommitted} / 未取り込み ${w.check.ahead})`) : '実体なし'}`));
   },
   'ws remove'({ pos, opt }) {
-    const w = findIn('ws', pos[0] || fail('作業場の番号が必要です'));
+    const w = findIn('ws', pos[0] || fail('作業場の IDが必要です'));
     const c = wsCheck(w);
     if (!c.clean) {
-      if (!opt.force) fail(`ここにしか無いものが残っています(未コミット ${c.uncommitted} / 未取り込み ${c.ahead})。それでも消すなら --force(人の承認が要ります)`);
+      if (!opt.force) fail(`未反映の変更があります(未コミット ${c.uncommitted} / 未取り込み ${c.ahead})。それでも削除するなら --force(人の承認が要ります)`);
       requireGate(w.task_id, '作業場の強制削除', w.id);
     }
     const r = getRepo(w.repo_id);
@@ -308,7 +308,7 @@ const cmd = {
     fs.rmSync(P.ws(w.task_id, w.id));
     try { fs.rmdirSync(path.dirname(w.path)); } catch { /* 他の作業場が残っている */ }
     commit([P.ws(w.task_id, w.id)], `ws: ${w.id} 片付け`);
-    console.log(`作業場 ${w.id} を消しました`);
+    console.log(`作業場 ${w.id} を削除しました`);
     tidyIfDone(w.task_id);
   },
 
@@ -319,7 +319,7 @@ const cmd = {
     const file = expand(need(opt, 'file'));
     if (!fs.existsSync(file)) fail(`${file} がありません`);
     const rel = path.relative(HUB, file);
-    if (rel.startsWith('..')) fail('記録のファイルは全体管理リポジトリの中に置いてください');
+    if (rel.startsWith('..')) fail('記録のファイルはデータリポジトリの中に置いてください');
     const r = { schema: SCHEMA, id: newId('r', (i) => fs.existsSync(P.rec(t.id, i))), task_id: t.id, kind, title: need(opt, 'title'), file: rel, status: REC.draft, published_url: '' };
     writeJson(P.rec(t.id, r.id), r);
     commit([P.rec(t.id, r.id), file], `record: ${r.id} ${r.title}`);
@@ -332,7 +332,7 @@ const cmd = {
     rows.forEach((r) => console.log(`${r.id}  ${r.task_id}  [${r.status}]  ${r.kind}  ${r.title}  ${r.file}`));
   },
   'record confirm'({ pos }) {
-    const r = findIn('rec', pos[0] || fail('記録の番号が必要です'));
+    const r = findIn('rec', pos[0] || fail('記録の IDが必要です'));
     if (r.status !== REC.draft) fail(`記録 ${r.id} は既に ${r.status} です`);
     requireGate(r.task_id, '確定', r.id);
     r.status = REC.confirmed;
@@ -342,17 +342,17 @@ const cmd = {
     tidyIfDone(r.task_id);
   },
   'record share'({ pos, opt }) {
-    const r = findIn('rec', pos[0] || fail('記録の番号が必要です'));
-    if (r.status !== REC.confirmed) fail(`共有できるのは確定した記録だけです(今は ${r.status})`);
+    const r = findIn('rec', pos[0] || fail('記録の IDが必要です'));
+    if (r.status !== REC.confirmed) fail(`公開できるのは確定した記録だけです(今は ${r.status})`);
     const url = need(opt, 'url');
-    requireGate(r.task_id, '共有', r.id);
+    requireGate(r.task_id, '公開', r.id);
     r.status = REC.shared; r.published_url = url;
     writeJson(P.rec(r.task_id, r.id), r);
-    commit([P.rec(r.task_id, r.id)], `record: ${r.id} 共有`);
-    console.log(`記録 ${r.id} を共有にしました`);
+    commit([P.rec(r.task_id, r.id)], `record: ${r.id} 公開`);
+    console.log(`記録 ${r.id} を公開にしました`);
   },
   'record drop'({ pos }) {
-    const r = findIn('rec', pos[0] || fail('記録の番号が必要です'));
+    const r = findIn('rec', pos[0] || fail('記録の IDが必要です'));
     if (r.status !== REC.draft) fail('捨てられるのは下書きだけです');
     const file = path.join(HUB, r.file);
     fs.rmSync(file, { force: true });
@@ -382,7 +382,7 @@ const cmd = {
     ds.forEach((d) => console.log(`${d.id}  ${d.day ? (d.day < ref ? `持ち越し(${d.day})` : d.day) : 'いつか'}  ${opt.all ? `[${d.status}] ` : ''}${d.text}${d.origin_task_id ? `  ← ${d.origin_task_id}` : ''}`));
   },
   'todo promote'({ pos, opt }) {
-    const f = P.todo(pos[0] || fail('ToDo の番号が必要です'));
+    const f = P.todo(pos[0] || fail('ToDo の IDが必要です'));
     if (!fs.existsSync(f)) fail(`ToDo ${pos[0]} がありません`);
     const d = readJson(f);
     if (d.status !== TODO.open) fail(`ToDo ${d.id} は既に ${d.status} です`);
@@ -417,11 +417,11 @@ const cmd = {
   },
   // 人だけが実行する。Claude Code 側では権限設定で毎回確認にしてある。
   'gate approve'({ pos }) {
-    const g = findIn('gate', pos[0] || fail('ゲートの番号が必要です'));
+    const g = findIn('gate', pos[0] || fail('承認ゲートの IDが必要です'));
     g.status = GATE.approved;
     writeJson(P.gate(g.task_id, g.id), g);
     commit([P.gate(g.task_id, g.id)], `gate: ${g.id} 承認`);
-    console.log(`ゲート ${g.id} を承認しました(${g.action} / ${g.target})`);
+    console.log(`承認ゲート ${g.id} を承認しました(${g.action} / ${g.target})`);
   },
   'gate check'({ opt }) {
     const t = taskArg(opt);
@@ -439,7 +439,7 @@ const cmd = {
     console.log('\n■ 承認待ち'); gates.forEach((g) => console.log(`${g.id}  ${g.task_id}  ${g.action} / ${g.target}`));
     console.log('\n■ ToDo(今日まで / 日付なし)'); cmd['todo list']({ opt: { day: 'today' } });
   },
-  // 登録の無いフォルダ(ゴミ)と、実体の無い登録を見つける。
+  // 未登録のフォルダ(削除対象)と、実体の無い登録を見つける。
   scan({ opt }) {
     const known = new Set(allTasks().flatMap((t) => wsOf(t.id).map((w) => w.path)));
     const stray = [];
@@ -456,7 +456,7 @@ const cmd = {
 };
 
 function setTodo(id, status) {
-  const f = P.todo(id || fail('ToDo の番号が必要です'));
+  const f = P.todo(id || fail('ToDo の IDが必要です'));
   if (!fs.existsSync(f)) fail(`ToDo ${id} がありません`);
   const d = readJson(f);
   if (d.status !== TODO.open) fail(`ToDo ${d.id} は既に ${d.status} です`);
