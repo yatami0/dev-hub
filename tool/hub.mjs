@@ -239,7 +239,9 @@ function sessionSettings(t) {
       enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true,
       filesystem: {
         allowWrite: [HUB, ...repos.map((r) => path.join(r, '.git'))],
-        denyWrite: [APPROVALS, KIT, ...gitDirs.flatMap((g) => [path.join(g, 'config'), path.join(g, 'hooks')])],
+        // hub リポジトリ自体が作業の対象になることがあるので、.git だけは外して、中身を1つずつ禁止する。
+        denyWrite: [APPROVALS, ...fs.readdirSync(KIT).filter((n) => n !== '.git').map((n) => path.join(KIT, n)),
+          ...gitDirs.flatMap((g) => [path.join(g, 'config'), path.join(g, 'hooks')])],
         denyRead: creds,
       },
     },
