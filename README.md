@@ -7,11 +7,28 @@ Claude が並列で進める作業を、1か所のデータで統制するため
 
 ## 導入
 
-Node.js と Git が要る。
+上から順に実行する。Linux(Windows では WSL の中)を前提にしている。
+
+### 1. 要るものを入れる
+
+| 要るもの | 使うところ |
+| --- | --- |
+| Node.js | `hub` コマンドと MCP |
+| Git | データの履歴と作業場 |
+| Claude Code(`claude` コマンド) | セッション |
+| bubblewrap、socat | セッションのサンドボックス |
+
+bubblewrap と socat は次で入る(Ubuntu / Debian の場合)。
+
+```bash
+sudo apt-get install bubblewrap socat
+```
+
+### 2. clone して初期化する
 
 ```bash
 git clone <このリポジトリ> ~/dev/hub
-node ~/dev/hub/tool/hub.mjs init --with-permissions
+node ~/dev/hub/tool/hub.mjs init
 hub status
 ```
 
@@ -21,28 +38,39 @@ hub status
 - `~/dev/repos`、`~/dev/work`、`~/dev/profiles`、`~/dev/data/approvals` を作る
 - `hub` コマンドを `~/.local/bin` につなぐ
 - Claude Code 向けのルール `~/dev/CLAUDE.md` をつなぐ
-- `--with-permissions` を付けると、push などを毎回人に確認する設定を `~/.claude/settings.json` に足す
 
-## プロファイルとセッション
+`hub` が見つからないときは、`~/.local/bin` を `PATH` に足す。
+`init` の最後に「承認の強制は入れていません」と出るが、そのままでよい。push などの承認が要る操作は、人が承認したあとに hub が実行する。
 
-セッションの起動には、Claude Code、bubblewrap、socat が要る(`sudo apt-get install bubblewrap socat`)。
+### 3. プロファイルを作る
+
+プロファイルは、セッションが使う Claude Code の設定フォルダ。作業にプロファイルを指定しなければ `default` が使われるので、まず `default` を作ってログインする。ログインは人がやる。
 
 ```bash
 hub profile add default
 CLAUDE_CONFIG_DIR=~/dev/profiles/default claude auth login
-hub session start --task <作業ID> --prompt "..."
+hub profile list
 ```
 
-既にある設定フォルダをそのままプロファイルにするときは `hub profile add default --path ~/.claude`。
-セッションに渡している設定は `hub session settings --task <作業ID>` で見られる。
+`hub profile list` で `default` が「ログイン済み」になっていればよい。
+既にある設定フォルダをそのままプロファイルにするときは、上の2行の代わりに `hub profile add default --path ~/.claude`。
 
-## MCP
+### 4. Claude Desktop に MCP をつなぐ
 
-Claude Desktop からは MCP でつなぐ。Windows の Claude Desktop の設定(`claude_desktop_config.json`)に次を足す。`node` の場所は、WSL の中で `which node` を実行して確かめる。
+Claude Desktop からは MCP でつなぐ。Windows の Claude Desktop の設定(`claude_desktop_config.json`)に次を足し、Claude Desktop を起動し直す。`/usr/bin/node` のところは、WSL の中で `which node` を実行して出た場所に、`<ユーザー名>` は WSL のユーザー名に置き換える。
 
 ```json
 { "mcpServers": { "hub": { "command": "wsl.exe", "args": ["--", "/usr/bin/node", "/home/<ユーザー名>/dev/hub/tool/mcp.mjs"] } } }
 ```
+
+### 5. 作業を1件通して確かめる
+
+```bash
+hub task new --title "試し" --purpose "導入の確認"
+hub session start --task <作業ID> --prompt "..."
+```
+
+`hub task new` が作業 ID を出すので、それを `--task` に渡す。セッションに渡している設定は `hub session settings --task <作業ID>` で見られる。
 
 ## 画面
 
