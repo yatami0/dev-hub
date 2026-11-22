@@ -1,0 +1,266 @@
+<title>hub 作業の全体</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* layout: 上に切り替え(全体 / 個別 / ToDo)、下に1カラムの一覧。承認待ちだけを橙で一番上に出す。色の役割は設計資料と同じ(作業=青 / 場所=緑 / 人の承認=橙) */
+:root{
+  --bg:#F5F7FA;--surface:#FFFFFF;--ink:#1A2330;--muted:#5A6676;--line:#D8DEE7;
+  --task:#2C56C9;--task-bg:#E6ECFB;--place:#0C7A72;--place-bg:#DEF3F0;--gate:#A85A08;--gate-bg:#FBEBD5;--rec-bg:#EEF1F5;
+  --font:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic UI","Yu Gothic",system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#11151B;--surface:#192029;--ink:#E5EAF1;--muted:#9BA6B5;--line:#2D3744;--task:#86A6FF;--task-bg:#1E2B4D;--place:#56CBC0;--place-bg:#12373A;--gate:#EDAA58;--gate-bg:#3D2A12;--rec-bg:#222B36}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#11151B;--surface:#192029;--ink:#E5EAF1;--muted:#9BA6B5;--line:#2D3744;--task:#86A6FF;--task-bg:#1E2B4D;--place:#56CBC0;--place-bg:#12373A;--gate:#EDAA58;--gate-bg:#3D2A12;--rec-bg:#222B36}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:15.5px;line-height:1.75;padding-block:24px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.wrap{max-width:880px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+h1{font-size:20px;margin:0;margin-right:auto}
+h2{font-size:16px;margin:0;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+h2 .n{font-size:13px;font-weight:400;color:var(--muted)}
+nav{display:flex;gap:4px;background:var(--rec-bg);border-radius:10px;padding:4px}
+nav button{background:transparent;color:var(--muted);padding:4px 14px;border-radius:7px}
+nav button[aria-current="true"]{background:var(--surface);color:var(--ink);font-weight:500}
+button{font:inherit;border:0;border-radius:8px;padding:5px 14px;cursor:pointer;background:var(--task);color:var(--surface)}
+button.ghost{background:transparent;color:var(--task);border:1px solid var(--line)}
+button.warn{background:var(--gate);color:var(--surface)}
+button.small{padding:2px 10px;font-size:13.5px}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid var(--task);outline-offset:2px}
+.stamp{font-size:13px;color:var(--muted)}
+section{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+section.gates{border-color:var(--gate);background:var(--gate-bg)}
+ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+li{display:flex;gap:6px 12px;align-items:baseline;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--line)}
+li:first-child{border-top:0}
+li .main{flex:1 1 260px;min-width:0;overflow-wrap:anywhere}
+li .acts{display:flex;gap:6px;flex-wrap:wrap}
+.id{font-family:var(--mono);font-size:12.5px;color:var(--muted);white-space:nowrap}
+.chip{display:inline-block;border-radius:999px;padding:0 10px;font-size:12.5px;line-height:1.7;white-space:nowrap;background:var(--rec-bg);color:var(--muted)}
+.chip.task{background:var(--task-bg);color:var(--task)}
+.chip.place{background:var(--place-bg);color:var(--place)}
+.chip.gate{background:var(--gate-bg);color:var(--gate)}
+.link{background:none;border:0;padding:0;color:var(--task);text-align:left;font-weight:500;cursor:pointer;border-radius:4px}
+.link:hover{text-decoration:underline}
+.muted{color:var(--muted);font-size:14px}
+.msg{font-size:14px;color:var(--gate);overflow-wrap:anywhere}
+form{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+input{font:inherit;color:inherit;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:5px 10px;min-width:0}
+input.grow{flex:1 1 200px}
+dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 16px;margin:0}
+dt{color:var(--muted);font-size:14px}dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.path{font-family:var(--mono);font-size:12.5px;color:var(--muted);overflow-wrap:anywhere}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>hub</h1>
+    <nav aria-label="画面の切り替え">
+      <button type="button" data-view="all">全体</button>
+      <button type="button" data-view="task">個別</button>
+      <button type="button" data-view="todos">ToDo</button>
+    </nav>
+    <span id="stamp" class="stamp"></span>
+    <button type="button" id="reload" class="ghost">読み直す</button>
+  </header>
+  <p id="banner" class="msg" hidden></p>
+  <div id="view" class="wrap"></div>
+</div>
+
+<script>
+const SERVER = 'host:hub';
+const TODAY = () => new Date().toLocaleDateString('sv-SE');
+const state = { view: 'all', taskId: '', tasks: [], gates: [], todos: [], detail: null, msg: {} };
+let mcp = null;
+
+// ---------- 小道具 ----------
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else if (v === true) el.setAttribute(k, '');
+    else if (v !== false && v != null) el.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) el.append(c);
+  return el;
+}
+const chip = (text, cls) => h('span', { class: `chip ${cls || ''}` }, text);
+const statusChip = (s) => chip(s, s === '進行中' ? 'task' : s === '承認待ち' ? 'gate' : s === '承認済み' || s === '確定' || s === '公開' ? 'place' : '');
+
+// エラーの種類ごとに、次にやることを変える。
+function explain(e) {
+  const c = e && e.code;
+  if (c === 'server_not_connected') return 'hub の MCP が見つかりません。Claude のデスクトップアプリでこの画面を開いているか、アプリの設定に hub の MCP が入っているかを確かめてください。';
+  if (c === 'not_in_manifest') return 'この画面には、その道具を使う許可が出ていません。アーティファクトの許可の設定で hub を有効にしてください。';
+  if (c === 'not_granted' || c === 'capability_disabled' || c === 'capability_removed') return 'この表示では MCP を使えません。Claude のデスクトップアプリで開いてください。';
+  if (c === 'approval_required') return 'この操作には、アプリでの承認が要ります。';
+  if (c === 'cancelled') return '確認の画面で取り消されました。実行していません。';
+  if (c === 'tool_error') return (e.message || 'hub がエラーを返しました').replace(/^エラー:\s*/, '');
+  if (c === 'server_unavailable' || c === 'upstream_error') return 'hub の MCP から応答がありませんでした。実行されたかどうか分からないので、読み直して確かめてください。';
+  return `失敗しました(${c || '不明'}): ${(e && e.message) || ''}`;
+}
+const read = async (tool, input) => (await mcp.callTool(SERVER, tool, input || {}, { cache: false })).payload;
+
+// 書き込みは、人がボタンを押したときに1回だけ呼ぶ。失敗しても自動ではやり直さない。
+async function act(key, tool, input, btn) {
+  if (btn) btn.disabled = true;
+  delete state.msg[key];
+  try { await mcp.callTool(SERVER, tool, input); }
+  catch (e) { state.msg[key] = explain(e); }
+  await load();
+}
+
+// ---------- 読み込み ----------
+async function load() {
+  if (!mcp) return;
+  try {
+    const jobs = [read('task_list'), read('gate_list', { pending: true }), read('todo_list')];
+    if (state.taskId) jobs.push(read('task_show', { id: state.taskId }).catch((e) => ({ error: explain(e) })));
+    const [tasks, gates, todos, detail] = await Promise.all(jobs);
+    state.tasks = Array.isArray(tasks) ? tasks : [];
+    state.gates = Array.isArray(gates) ? gates : [];
+    state.todos = Array.isArray(todos) ? todos : [];
+    state.detail = detail || null;
+    document.getElementById('banner').hidden = true;
+    document.getElementById('stamp').textContent = `${new Date().toLocaleTimeString('ja-JP')} 時点`;
+  } catch (e) {
+    const b = document.getElementById('banner'); b.textContent = explain(e); b.hidden = false;
+  }
+  render();
+}
+
+// ---------- 画面 ----------
+const titleOf = (id) => (state.tasks.find((t) => t.id === id) || {}).title || id;
+function openTask(id) { state.taskId = id; state.view = 'task'; state.detail = null; location.hash = 'task'; render(); load(); }
+const taskLink = (id, text) => h('button', { type: 'button', class: 'link', onclick: () => openTask(id) }, text || titleOf(id));
+const note = (key) => (state.msg[key] ? h('p', { class: 'msg' }, state.msg[key]) : null);
+
+// 承認は2段階。1回目で内容を見せ、2回目で実行する。
+let arming = '';
+function gateSection(gates) {
+  if (!gates.length) return null;
+  return h('section', { class: 'gates' },
+    h('h2', null, '承認待ち', h('span', { class: 'n' }, `${gates.length} 件。承認すると、hub がその操作を実行します`)),
+    h('ul', null, gates.map((g) => h('li', null,
+      h('span', { class: 'main' }, chip(g.action, 'gate'), ' ', taskLink(g.task_id), ' ', h('span', { class: 'id' }, `${g.target} / ${g.id}`)),
+      h('span', { class: 'acts' }, arming === g.id
+        ? [h('button', { type: 'button', class: 'warn small', onclick: (ev) => { arming = ''; act('gates', 'gate_approve', { id: g.id }, ev.currentTarget); } }, `${g.action} を実行する`),
+           h('button', { type: 'button', class: 'ghost small', onclick: () => { arming = ''; render(); } }, 'やめる')]
+        : h('button', { type: 'button', class: 'warn small', onclick: () => { arming = g.id; render(); } }, '承認する')),
+    ))),
+    note('gates'));
+}
+
+function viewAll() {
+  const live = state.tasks;
+  const rows = [];
+  const walk = (pid, depth) => live.filter((t) => t.parent_id === pid).forEach((t) => {
+    const n = state.todos.filter((d) => d.origin_task_id === t.id).length;
+    rows.push(h('li', { style: `padding-left:${depth * 22}px` },
+      h('span', { class: 'main' }, taskLink(t.id, t.title), ' ', h('span', { class: 'id' }, t.id)),
+      n ? chip(`ToDo ${n}`) : null, statusChip(t.status)));
+    walk(t.id, depth + 1);
+  });
+  walk('', 0);
+  live.filter((t) => t.parent_id && !live.some((p) => p.id === t.parent_id)).forEach((t) => rows.push(h('li', null,
+    h('span', { class: 'main' }, taskLink(t.id, t.title), ' ', h('span', { class: 'id' }, t.id)), chip('親は片付け済み'), statusChip(t.status))));
+  return [
+    gateSection(state.gates),
+    h('section', null,
+      h('h2', null, '作業', h('span', { class: 'n' }, `${live.length} 件(片付け済みは除く)`)),
+      rows.length ? h('ul', null, rows) : h('p', { class: 'muted' }, '進行中の作業はありません。下から作れます。'),
+      h('form', { onsubmit: (ev) => { ev.preventDefault(); const f = ev.currentTarget; act('newtask', 'task_new', { title: f.title.value.trim(), purpose: f.purpose.value.trim() }, f.querySelector('button')); } },
+        h('input', { id: 'new-title', name: 'title', class: 'grow', placeholder: '作業の名前', required: true, autocomplete: 'off' }),
+        h('input', { id: 'new-purpose', name: 'purpose', class: 'grow', placeholder: '何のためにやるか', required: true, autocomplete: 'off' }),
+        h('button', { type: 'submit' }, '作業を作る')),
+      note('newtask')),
+  ];
+}
+
+function viewTask() {
+  if (!state.taskId) return [h('section', null, h('p', { class: 'muted' }, '「全体」で作業を選ぶと、ここに詳細が出ます。'))];
+  const d = state.detail;
+  if (!d) return [h('section', null, h('p', { class: 'muted' }, '読み込み中です。'))];
+  if (d.error) return [h('section', null, h('p', { class: 'msg' }, d.error))];
+  const t = d.task;
+  const wsState = (c) => (!c.exists ? chip('実体なし', 'gate') : c.clean ? chip('未反映の変更なし', 'place') : chip(`未反映あり(未コミット ${c.uncommitted} / 未取り込み ${c.ahead})`, 'gate'));
+  const block = (title, items, row, empty) => h('section', null,
+    h('h2', null, title, h('span', { class: 'n' }, `${items.length} 件`)),
+    items.length ? h('ul', null, items.map(row)) : h('p', { class: 'muted' }, empty));
+  const openTodos = d.todos.filter((x) => x.status === '未着手');
+  return [
+    gateSection(d.gates.filter((g) => g.status === '承認待ち')),
+    h('section', null,
+      h('h2', null, t.title, statusChip(t.status)),
+      h('dl', null,
+        h('dt', null, 'ID'), h('dd', { class: 'id' }, t.id),
+        h('dt', null, '目的'), h('dd', null, t.purpose),
+        h('dt', null, 'プロファイル'), h('dd', null, t.profile || 'default(既定)'),
+        t.parent_id ? [h('dt', null, '親'), h('dd', null, taskLink(t.parent_id))] : null,
+        t.absorbed_into ? [h('dt', null, '吸収先'), h('dd', null, taskLink(t.absorbed_into))] : null,
+        h('dt', null, '作った日'), h('dd', null, t.created_at + (t.closed_at ? `(終了 ${t.closed_at})` : ''))),
+      t.status === '進行中' ? h('div', null, h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('close', 'task_close', { id: t.id }, ev.currentTarget) }, 'この作業を終了する')) : null,
+      note('close')),
+    d.children.length ? block('子の作業', d.children, (c) => h('li', null, h('span', { class: 'main' }, taskLink(c.id, c.title), ' ', h('span', { class: 'id' }, c.id)), statusChip(c.status)), '') : null,
+    block('作業場', d.workspaces, (w) => h('li', null,
+      h('span', { class: 'main' }, chip(`${w.repo_id} / ${w.branch}`, 'place'), ' ', h('span', { class: 'id' }, w.id), h('div', { class: 'path' }, w.path)), wsState(w.check)), '作業場はありません。読むだけの作業なら不要です。'),
+    block('記録', d.records, (r) => h('li', null,
+      h('span', { class: 'main' }, chip(r.kind), ' ', r.title, ' ', h('span', { class: 'id' }, r.id), h('div', { class: 'path' }, r.published_url || r.file)), statusChip(r.status)), '記録はまだありません。'),
+    block('セッション', d.sessions || [], (s) => h('li', null,
+      h('span', { class: 'main' }, h('span', { class: 'id' }, s.id), ' ', s.started_at, h('div', { class: 'path' }, s.cwd)), chip(s.profile)), 'hub から起動したセッションはありません。'),
+    block('この作業から出た ToDo', openTodos, (x) => h('li', null, h('span', { class: 'main' }, x.text, ' ', h('span', { class: 'id' }, x.id)), x.day ? chip(x.day) : chip('いつか')), '未着手の ToDo はありません。'),
+    d.gates.some((g) => g.status !== '承認待ち') ? block('済んだ承認', d.gates.filter((g) => g.status !== '承認待ち'), (g) => h('li', null,
+      h('span', { class: 'main' }, chip(g.action), ' ', h('span', { class: 'id' }, `${g.target} / ${g.id}`)), statusChip(g.status)), '') : null,
+  ];
+}
+
+function viewTodos() {
+  const today = TODAY();
+  const due = state.todos.filter((d) => d.day && d.day <= today), later = state.todos.filter((d) => d.day && d.day > today), someday = state.todos.filter((d) => !d.day);
+  const byDay = (a, b) => a.day.localeCompare(b.day);
+  const row = (d) => h('li', null,
+    h('span', { class: 'main' }, d.text, ' ', h('span', { class: 'id' }, d.id), d.origin_task_id ? h('div', { class: 'muted' }, '← ', taskLink(d.origin_task_id)) : null),
+    d.day ? chip(d.day < today ? `持ち越し ${d.day}` : d.day, d.day <= today ? 'gate' : '') : null,
+    h('span', { class: 'acts' },
+      h('button', { type: 'button', class: 'small', onclick: (ev) => act('todos', 'todo_done', { id: d.id }, ev.currentTarget) }, '完了'),
+      h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('todos', 'todo_promote', { id: d.id }, ev.currentTarget) }, '作業にする'),
+      h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('todos', 'todo_drop', { id: d.id }, ev.currentTarget) }, '捨てる')));
+  const group = (title, items) => (items.length ? h('section', null, h('h2', null, title, h('span', { class: 'n' }, `${items.length} 件`)), h('ul', null, items.map(row))) : null);
+  return [
+    h('section', null,
+      h('h2', null, 'ToDo を残す'),
+      h('form', { onsubmit: (ev) => { ev.preventDefault(); const f = ev.currentTarget; const input = { text: f.text.value.trim() }; if (f.day.value) input.day = f.day.value; act('todos', 'todo_add', input, f.querySelector('button')); } },
+        h('input', { id: 'todo-text', name: 'text', class: 'grow', placeholder: '一言で', required: true, autocomplete: 'off' }),
+        h('input', { id: 'todo-day', name: 'day', type: 'date', 'aria-label': 'やるつもりの日' }),
+        h('button', { type: 'submit' }, '残す')),
+      note('todos')),
+    group('今日まで', due.sort(byDay)), group('この先', later.sort(byDay)), group('いつか', someday),
+    state.todos.length ? null : h('section', null, h('p', { class: 'muted' }, '未着手の ToDo はありません。')),
+  ];
+}
+
+function render() {
+  document.querySelectorAll('nav button').forEach((b) => b.setAttribute('aria-current', String(b.dataset.view === state.view)));
+  const kids = (state.view === 'task' ? viewTask() : state.view === 'todos' ? viewTodos() : viewAll()).flat().filter(Boolean);
+  document.getElementById('view').replaceChildren(...kids);
+}
+
+// ---------- 入口 ----------
+function go(view) { state.view = ['all', 'task', 'todos'].includes(view) ? view : 'all'; render(); }
+document.querySelectorAll('nav button').forEach((b) => b.addEventListener('click', () => { location.hash = b.dataset.view; go(b.dataset.view); }));
+window.addEventListener('hashchange', () => go(location.hash.slice(1)));
+document.getElementById('reload').addEventListener('click', load);
+go(location.hash.slice(1));
+
+(async () => {
+  mcp = await (window.claude && window.claude.use ? window.claude.use('mcp') : null);
+  if (!mcp) {
+    const b = document.getElementById('banner');
+    b.textContent = 'この表示では MCP を使えません。アーティファクトとして公開したものを、Claude のデスクトップアプリで開いてください。';
+    b.hidden = false;
+    return;
+  }
+  await load();
+})();
+</script>

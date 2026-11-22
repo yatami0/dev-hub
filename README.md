@@ -44,6 +44,10 @@ Claude Desktop からは MCP でつなぐ。Windows の Claude Desktop の設定
 { "mcpServers": { "hub": { "command": "wsl.exe", "args": ["--", "/usr/bin/node", "/home/<ユーザー名>/dev/hub/tool/mcp.mjs"] } } }
 ```
 
+## 画面
+
+画面のひな形は `screens/hub.html`。Claude に「アーティファクトとして公開して」と頼み、Claude のデスクトップアプリで開く。公開のときは、手元の MCP `host:hub` と、画面が呼ぶ道具を許可に入れる。ファイルを直接開いても、MCP には届かない。
+
 環境ごとの道具(拡張)は `~/dev/extensions/*.mjs` に置く。形は design.html の「コアと拡張」を参照。
 
 置き場を変えるときは、環境変数 `HUB_ROOT` に `~/dev` の代わりの場所を入れる。
