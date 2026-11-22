@@ -61,7 +61,7 @@ dt{color:var(--muted);font-size:14px}dd{margin:0;min-width:0;overflow-wrap:anywh
       <button type="button" data-view="todos">ToDo</button>
     </nav>
     <span id="stamp" class="stamp"></span>
-    <button type="button" id="reload" class="ghost">読み直す</button>
+    <button type="button" id="reload" class="ghost">更新</button>
   </header>
   <p id="banner" class="msg" hidden></p>
   <div id="view" class="wrap"></div>
@@ -97,7 +97,7 @@ function explain(e) {
   if (c === 'approval_required') return 'この操作には、アプリでの承認が要ります。';
   if (c === 'cancelled') return '確認の画面で取り消されました。実行していません。';
   if (c === 'tool_error') return (e.message || 'hub がエラーを返しました').replace(/^エラー:\s*/, '');
-  if (c === 'server_unavailable' || c === 'upstream_error') return 'hub の MCP から応答がありませんでした。実行されたかどうか分からないので、読み直して確かめてください。';
+  if (c === 'server_unavailable' || c === 'upstream_error') return 'hub の MCP から応答がありませんでした。実行されたかどうか分からないので、更新して確認してください。';
   return `失敗しました(${c || '不明'}): ${(e && e.message) || ''}`;
 }
 const read = async (tool, input) => (await mcp.callTool(SERVER, tool, input || {}, { cache: false })).payload;
@@ -123,7 +123,7 @@ async function load() {
     state.todos = Array.isArray(todos) ? todos : [];
     state.detail = detail || null;
     document.getElementById('banner').hidden = true;
-    document.getElementById('stamp').textContent = `${new Date().toLocaleTimeString('ja-JP')} 時点`;
+    document.getElementById('stamp').textContent = `更新 ${new Date().toLocaleTimeString('ja-JP')}`;
   } catch (e) {
     const b = document.getElementById('banner'); b.textContent = explain(e); b.hidden = false;
   }
@@ -140,11 +140,11 @@ const note = (key) => (state.msg[key] ? h('p', { class: 'msg' }, state.msg[key])
 function gateSection(gates) {
   if (!gates.length) return null;
   return h('section', { class: 'gates' },
-    h('h2', null, '承認待ち', h('span', { class: 'n' }, `${gates.length} 件。承認すると、hub がその操作を実行します`)),
+    h('h2', null, '承認待ち', h('span', { class: 'n' }, `${gates.length} 件(承認すると hub が操作を実行)`)),
     h('ul', null, gates.map((g) => h('li', null,
       h('span', { class: 'main' }, chip(g.action, 'gate'), ' ', taskLink(g.task_id), ' ', h('span', { class: 'id' }, `${g.target} / ${g.id}`)),
       h('span', { class: 'acts' },
-        h('button', { type: 'button', class: 'warn small', onclick: (ev) => act('gates', 'gate_approve', { id: g.id }, ev.currentTarget) }, `承認して ${g.action} を実行`)),
+        h('button', { type: 'button', class: 'warn small', onclick: (ev) => act('gates', 'gate_approve', { id: g.id }, ev.currentTarget) }, '承認して実行')),
     ))),
     note('gates'));
 }
@@ -166,19 +166,19 @@ function viewAll() {
     gateSection(state.gates),
     h('section', null,
       h('h2', null, '作業', h('span', { class: 'n' }, `${live.length} 件(片付け済みは除く)`)),
-      rows.length ? h('ul', null, rows) : h('p', { class: 'muted' }, '進行中の作業はありません。下から作れます。'),
+      rows.length ? h('ul', null, rows) : h('p', { class: 'muted' }, '作業はありません。'),
       h('form', { onsubmit: (ev) => { ev.preventDefault(); const f = ev.currentTarget; act('newtask', 'task_new', { title: f.title.value.trim(), purpose: f.purpose.value.trim() }, f.querySelector('button')); } },
-        h('input', { id: 'new-title', name: 'title', class: 'grow', placeholder: '作業の名前', required: true, autocomplete: 'off' }),
-        h('input', { id: 'new-purpose', name: 'purpose', class: 'grow', placeholder: '何のためにやるか', required: true, autocomplete: 'off' }),
-        h('button', { type: 'submit' }, '作業を作る')),
+        h('input', { id: 'new-title', name: 'title', class: 'grow', placeholder: '名前', required: true, autocomplete: 'off' }),
+        h('input', { id: 'new-purpose', name: 'purpose', class: 'grow', placeholder: '目的', required: true, autocomplete: 'off' }),
+        h('button', { type: 'submit' }, '作成')),
       note('newtask')),
   ];
 }
 
 function viewTask() {
-  if (!state.taskId) return [h('section', null, h('p', { class: 'muted' }, '「全体」で作業を選ぶと、ここに詳細が出ます。'))];
+  if (!state.taskId) return [h('section', null, h('p', { class: 'muted' }, '作業が選択されていません。「全体」で作業を選択してください。'))];
   const d = state.detail;
-  if (!d) return [h('section', null, h('p', { class: 'muted' }, '読み込み中です。'))];
+  if (!d) return [h('section', null, h('p', { class: 'muted' }, '読み込み中'))];
   if (d.error) return [h('section', null, h('p', { class: 'msg' }, d.error))];
   const t = d.task;
   const wsState = (c) => (!c.exists ? chip('実体なし', 'gate') : c.clean ? chip('未反映の変更なし', 'place') : chip(`未反映あり(未コミット ${c.uncommitted} / 未取り込み ${c.ahead})`, 'gate'));
@@ -197,17 +197,17 @@ function viewTask() {
         t.parent_id ? [h('dt', null, '親'), h('dd', null, taskLink(t.parent_id))] : null,
         t.absorbed_into ? [h('dt', null, '吸収先'), h('dd', null, taskLink(t.absorbed_into))] : null,
         h('dt', null, '作った日'), h('dd', null, t.created_at + (t.closed_at ? `(終了 ${t.closed_at})` : ''))),
-      t.status === '進行中' ? h('div', null, h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('close', 'task_close', { id: t.id }, ev.currentTarget) }, 'この作業を終了する')) : null,
+      t.status === '進行中' ? h('div', null, h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('close', 'task_close', { id: t.id }, ev.currentTarget) }, '終了')) : null,
       note('close')),
     d.children.length ? block('子の作業', d.children, (c) => h('li', null, h('span', { class: 'main' }, taskLink(c.id, c.title), ' ', h('span', { class: 'id' }, c.id)), statusChip(c.status)), '') : null,
     block('作業場', d.workspaces, (w) => h('li', null,
-      h('span', { class: 'main' }, chip(`${w.repo_id} / ${w.branch}`, 'place'), ' ', h('span', { class: 'id' }, w.id), h('div', { class: 'path' }, w.path)), wsState(w.check)), '作業場はありません。読むだけの作業なら不要です。'),
+      h('span', { class: 'main' }, chip(`${w.repo_id} / ${w.branch}`, 'place'), ' ', h('span', { class: 'id' }, w.id), h('div', { class: 'path' }, w.path)), wsState(w.check)), '作業場はありません。'),
     block('記録', d.records, (r) => h('li', null,
-      h('span', { class: 'main' }, chip(r.kind), ' ', r.title, ' ', h('span', { class: 'id' }, r.id), h('div', { class: 'path' }, r.published_url || r.file)), statusChip(r.status)), '記録はまだありません。'),
+      h('span', { class: 'main' }, chip(r.kind), ' ', r.title, ' ', h('span', { class: 'id' }, r.id), h('div', { class: 'path' }, r.published_url || r.file)), statusChip(r.status)), '記録はありません。'),
     block('セッション', d.sessions || [], (s) => h('li', null,
-      h('span', { class: 'main' }, h('span', { class: 'id' }, s.id), ' ', s.started_at, h('div', { class: 'path' }, s.cwd)), chip(s.profile)), 'hub から起動したセッションはありません。'),
-    block('この作業から出た ToDo', openTodos, (x) => h('li', null, h('span', { class: 'main' }, x.text, ' ', h('span', { class: 'id' }, x.id)), x.day ? chip(x.day) : chip('いつか')), '未着手の ToDo はありません。'),
-    d.gates.some((g) => g.status !== '承認待ち') ? block('済んだ承認', d.gates.filter((g) => g.status !== '承認待ち'), (g) => h('li', null,
+      h('span', { class: 'main' }, h('span', { class: 'id' }, s.id), ' ', s.started_at, h('div', { class: 'path' }, s.cwd)), chip(s.profile)), 'セッションはありません。'),
+    block('ToDo', openTodos, (x) => h('li', null, h('span', { class: 'main' }, x.text, ' ', h('span', { class: 'id' }, x.id)), x.day ? chip(x.day) : chip('日付なし')), '未着手の ToDo はありません。'),
+    d.gates.some((g) => g.status !== '承認待ち') ? block('承認の履歴', d.gates.filter((g) => g.status !== '承認待ち'), (g) => h('li', null,
       h('span', { class: 'main' }, chip(g.action), ' ', h('span', { class: 'id' }, `${g.target} / ${g.id}`)), statusChip(g.status)), '') : null,
   ];
 }
@@ -218,21 +218,21 @@ function viewTodos() {
   const byDay = (a, b) => a.day.localeCompare(b.day);
   const row = (d) => h('li', null,
     h('span', { class: 'main' }, d.text, ' ', h('span', { class: 'id' }, d.id), d.origin_task_id ? h('div', { class: 'muted' }, '← ', taskLink(d.origin_task_id)) : null),
-    d.day ? chip(d.day < today ? `持ち越し ${d.day}` : d.day, d.day <= today ? 'gate' : '') : null,
+    d.day ? chip(d.day < today ? `超過 ${d.day}` : d.day, d.day <= today ? 'gate' : '') : null,
     h('span', { class: 'acts' },
       h('button', { type: 'button', class: 'small', onclick: (ev) => act('todos', 'todo_done', { id: d.id }, ev.currentTarget) }, '完了'),
-      h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('todos', 'todo_promote', { id: d.id }, ev.currentTarget) }, '作業にする'),
-      h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('todos', 'todo_drop', { id: d.id }, ev.currentTarget) }, '捨てる')));
+      h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('todos', 'todo_promote', { id: d.id }, ev.currentTarget) }, '作業化'),
+      h('button', { type: 'button', class: 'ghost small', onclick: (ev) => act('todos', 'todo_drop', { id: d.id }, ev.currentTarget) }, '破棄')));
   const group = (title, items) => (items.length ? h('section', null, h('h2', null, title, h('span', { class: 'n' }, `${items.length} 件`)), h('ul', null, items.map(row))) : null);
   return [
     h('section', null,
-      h('h2', null, 'ToDo を残す'),
+      h('h2', null, 'ToDo の追加'),
       h('form', { onsubmit: (ev) => { ev.preventDefault(); const f = ev.currentTarget; const input = { text: f.text.value.trim() }; if (f.day.value) input.day = f.day.value; act('todos', 'todo_add', input, f.querySelector('button')); } },
-        h('input', { id: 'todo-text', name: 'text', class: 'grow', placeholder: '一言で', required: true, autocomplete: 'off' }),
-        h('input', { id: 'todo-day', name: 'day', type: 'date', 'aria-label': 'やるつもりの日' }),
-        h('button', { type: 'submit' }, '残す')),
+        h('input', { id: 'todo-text', name: 'text', class: 'grow', placeholder: '内容', required: true, autocomplete: 'off' }),
+        h('input', { id: 'todo-day', name: 'day', type: 'date', 'aria-label': '予定日' }),
+        h('button', { type: 'submit' }, '追加')),
       note('todos')),
-    group('今日まで', due.sort(byDay)), group('この先', later.sort(byDay)), group('いつか', someday),
+    group('今日まで', due.sort(byDay)), group('予定日あり', later.sort(byDay)), group('日付なし', someday),
     state.todos.length ? null : h('section', null, h('p', { class: 'muted' }, '未着手の ToDo はありません。')),
   ];
 }
