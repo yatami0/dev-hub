@@ -330,7 +330,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <div class="tbl"><table>
     <tr><th>記録の状態</th><th>置き場</th><th>失ったら</th></tr>
     <tr><td>下書き</td><td>ローカルに置くだけ</td><td>諦める</td></tr>
-    <tr><td>確定</td><td>残すと決めたもの。データ用のリモートをつないだ環境では push する</td><td>リモートをつないでいれば戻せる</td></tr>
+    <tr><td>確定</td><td>残すと決めたもの。ローカルにコミットされる。データ用のリモートをつないだ環境では、push しておける</td><td>リモートをつないでいれば戻せる</td></tr>
     <tr><td>公開</td><td>claude.ai にも出す</td><td>—</td></tr>
   </table></div>
 </section>
@@ -369,7 +369,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="roles">
   <h2>Claude と人の分担</h2>
-  <p>操作は基本的にすべて Claude が行います。人が挟まるのは、やり直しがきかない操作だけです。その箇所は、作業を作る時点で承認ゲートとして登録され、画面に「承認待ち」として並びます。</p>
+  <p>操作は基本的にすべて Claude が行います。人が挟まるのは、やり直しがきかない操作だけです。その箇所は、操作が必要になった時点で承認ゲートとして登録され、画面に「承認待ち」として並びます。</p>
   <div class="tbl"><table>
     <tr><th>Claude が自分でやる</th><th>人が承認する</th></tr>
     <tr><td>作業を作る、子に分ける、終了する</td><td>リモートへの push</td></tr>
@@ -410,7 +410,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <p>作業は ToDo を経由しなくても作れます。「これをやって」と頼めば、その場で作業が1件できます。ToDo は、いますぐ作業にするほどではないものを取っておく場所です。</p>
   <div class="tbl"><table>
     <tr><th>場面</th><th>きっかけ</th><th>やること</th></tr>
-    <tr><td>作業を作る</td><td>人が頼んだとき。または ToDo を作業にすると決めたとき</td><td>目的を書き、必要になる承認を承認ゲートとして登録する</td></tr>
+    <tr><td>作業を作る</td><td>人が頼んだとき。または ToDo を作業にすると決めたとき</td><td>目的を書く。使うプロファイルが既定と違うなら選ぶ</td></tr>
     <tr><td>作業を進める</td><td>作業が進行中のあいだ</td><td>作業場を作る。記録を書く。大きくなったら子に分ける。引っかかりは ToDo に残す</td></tr>
     <tr><td>承認に答える</td><td>承認待ちが出たとき</td><td>人が承認ゲートを承認する。承認されるまで、その操作は止まる</td></tr>
     <tr><td>終了する</td><td>目的を果たした、吸収された、やめた、のどれか</td><td>子を先に整理する。その作業から出た ToDo を仕分ける</td></tr>
@@ -425,7 +425,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="sessions">
   <h2>セッションと認証</h2>
-  <p>人は Claude Desktop から作業を頼み、hub が WSL の中で Claude Code のセッションを起動します。プロファイル、セッションの起動と再開、承認の待ち行列、hub による push は <code>hub</code> コマンドに入っています。MCP と、外部のサービスの認証を hub が持つ部分は、まだ作っていません。</p>
+  <p>人は Claude Desktop から作業を頼み、hub が WSL の中で Claude Code のセッションを起動します。プロファイル、セッションの起動と再開、承認の待ち行列、hub による push は <code>hub</code> コマンドに入っています。MCP も <code>tool/mcp.mjs</code> に入っています。外部のサービスの認証を hub が持つ部分と、リポジトリの clone や PR の作成を hub が行う部分は、まだ作っていません。</p>
 
   <h3>起動の流れ</h3>
   <div class="fig">
@@ -522,7 +522,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td>禁止の設定</td><td>プロファイルの設定で、特定のコマンドや道具を禁止する。Read / Edit / Write の道具から、認証情報の置き場と承認の記録を守るのもこの層</td><td>中くらい。書き方を変えると一致しない場合がある</td></tr>
     <tr><td>サンドボックス</td><td>Bash から、認証情報の置き場と承認の記録に触れないようにする。外部との通信も止める</td><td>上の2つを成り立たせる条件。WSL2 で動くことを確認済み。効くのは Bash だけ</td></tr>
   </table></div>
-  <p>サンドボックスと禁止の設定は、必ず両方を入れます。サンドボックスは Bash にしか効かず、禁止の設定は Bash の中で動くコマンドには効かないからです。プロファイルに入れる設定は次のとおりです。</p>
+  <p>サンドボックスと禁止の設定は、必ず両方を入れます。サンドボックスは Bash にしか効かず、禁止の設定は Bash の中で動くコマンドには効かないからです。hub がセッションに渡す設定は次のとおりです。</p>
   <div class="tbl"><table>
     <tr><th>設定</th><th>値</th><th>理由</th></tr>
     <tr><td class="f">sandbox.enabled</td><td>true</td><td>Bash をサンドボックスの中で動かす</td></tr>
@@ -530,7 +530,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td class="f">sandbox.allowUnsandboxedCommands</td><td>false</td><td>サンドボックスの外で実行し直す道をふさぐ</td></tr>
     <tr><td class="f">sandbox.filesystem.denyRead</td><td>認証情報の置き場</td><td>既定では、認証ファイルを Bash から読める</td></tr>
     <tr><td class="f">sandbox.filesystem.allowWrite</td><td>データリポジトリ、作業場の元のリポジトリの <code>.git</code></td><td>セッションの中から <code>hub</code> コマンドとコミットを使えるようにする</td></tr>
-    <tr><td class="f">sandbox.filesystem.denyWrite</td><td>承認の記録、hub リポジトリ、各 <code>.git</code> の <code>config</code> と <code>hooks</code></td><td>許可と禁止が重なったときは、禁止が勝つ。Git の設定とフックは、hub があとで Git を動かすときに実行されうるので止める</td></tr>
+    <tr><td class="f">sandbox.filesystem.denyWrite</td><td>承認の記録、hub リポジトリの中身(<code>.git</code> を除く)、各 <code>.git</code> の <code>config</code> と <code>hooks</code></td><td>許可と禁止が重なったときは、禁止が勝つ。Git の設定とフックは、hub があとで Git を動かすときに実行されうるので止める</td></tr>
+    <tr><td class="f">permissions.allow</td><td><code>Read(...)</code> を hub リポジトリ、データリポジトリ、<code>repos</code>、<code>work</code> に</td><td>作業のフォルダの外でも、Read の道具で読めるようにする。プロファイルは含めない</td></tr>
     <tr><td class="f">permissions.deny</td><td><code>Edit(...)</code> を承認の記録と hub リポジトリに、<code>Read(...)</code> を認証情報に、<code>Bash(git push*)</code> と <code>Bash(hub gate approve*)</code></td><td>Read / Edit / Write の道具を止める。Read の禁止は書き込みも止める</td></tr>
   </table></div>
   <p>この設定は、セッションを起動するたびに hub が組み立てて渡します。中身は <code>hub session settings</code> で見られます。hub 自身も、Git を動かすときはフックを無効にします。</p>
@@ -548,7 +549,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   </table></div>
   <p>道具の入口は2つあります。人は Claude Desktop から MCP 経由で呼び、WSL の中の Claude のセッションは <code>hub</code> コマンドとして呼びます。中のロジックは同じです。</p>
   <ul>
-    <li>MCP の本体は <code>tool/mcp.mjs</code> です。コアの道具は、<code>hub</code> コマンドと1対1で対応します。名前は、コマンドの空白を <code>_</code> に替えたものです(<code>hub task new</code> は <code>task_new</code>)。</li>
+    <li>MCP の本体は <code>tool/mcp.mjs</code> です。コアの道具は、どれも <code>hub</code> コマンドを1つ呼びます。環境を整えるためのコマンド(<code>init</code>、<code>profile add</code>、<code>session settings</code>、<code>gate check</code>)は MCP にはありません。名前は、コマンドの空白を <code>_</code> に替えたものです(<code>hub task new</code> は <code>task_new</code>)。</li>
     <li>拡張は、環境ごとに <code>~/dev/extensions/*.mjs</code> へ置きます。MCP が起動のときに読み込み、名前の先頭に <code>ext_</code> を付けて並べます。</li>
     <li>承認(<code>gate_approve</code>)も MCP から呼べます。人がはっきり承認したときだけ呼ぶ道具です。Claude Desktop 側で、この道具を「毎回確認する」にしておきます。</li>
     <li>セッションの起動と再開は、終わるまで待ってから結果を返します。長い作業では、Claude Desktop 側の待ち時間を超える可能性があります。(未確認)</li>
@@ -582,7 +583,8 @@ export const tools = [{
     <li>禁止した操作、確認が要る操作、許可していない操作は、どれもその操作だけが拒否される。セッションは止まらず、拒否された操作はコマンドの中身つきで結果に入る。</li>
     <li>サンドボックスは WSL2 で動く。Bash からの読み書きを場所ごとに止められる。Read / Write の道具は、禁止の設定で止められる。</li>
     <li>プロファイルを <code>CLAUDE_CONFIG_DIR</code> で指定したセッションも、再開できる。</li>
-    <li>サンドボックスの中から <code>hub</code> コマンドでデータを書ける。承認の記録、hub リポジトリ、Git の設定とフックには書けない。</li>
+    <li>サンドボックスの中から <code>hub</code> コマンドでデータを書ける。承認の記録、hub リポジトリの中身、Git の設定とフックには書けない。</li>
+    <li>本番の置き場で、セッションを2つ同時に起動して作業させられる。片方は作業場でコミットして push を承認待ちに登録し、もう片方は調査の記録を書いて登録した。</li>
     <li>Windows 側の Claude Desktop から、<code>wsl.exe</code> 経由で WSL の中の MCP に届く。読み取りも書き込みも通る。</li>
     <li>アーティファクトから、手元の hub の MCP を読み書きできる。画面から足した ToDo が、データリポジトリに入ってコミットされた。</li>
     <li>アーティファクトが手元の MCP を呼べるのは、持ち主が Claude のデスクトップアプリで開いたときだけ。ファイルを直接開いた場合や、ブラウザで開いた場合は呼べない。</li>
@@ -600,10 +602,10 @@ export const tools = [{
     <tr><td>置き場</td><td><code>~/dev/hub</code>(clone したもの)</td><td><code>~/dev/data</code>(データリポジトリ)</td></tr>
     <tr><td>環境をまたいで</td><td>同じものを使う</td><td>混ぜない</td></tr>
   </table></div>
-  <p>場所はデータの <code>path</code> と <code>file</code> が知っているので、フォルダの規約で厳しく縛る必要はありません。固定するのは、データリポジトリの場所だけです。下は既定の配置です。</p>
+  <p>場所はデータの <code>path</code> と <code>file</code> が知っているので、フォルダの規約で厳しく縛る必要はありません。置き場はすべて <code>HUB_ROOT</code>(既定は <code>~/dev</code>)の下に決まっていて、変えられるのは、登録するリポジトリの本体の場所です。</p>
 <pre>~/dev/
   hub/                          <span class="c">仕組み(このリポジトリを clone したもの)</span>
-  data/                         <span class="c">データリポジトリ(データ。ここだけ固定)</span>
+  data/                         <span class="c">データリポジトリ(データ)</span>
     tasks/&lt;作業ID&gt;/              <span class="c">作業1件のデータと、その記録の HTML</span>
     approvals/                  <span class="c">承認の記録(セッションからは書けない)</span>
     todos/                      <span class="c">ToDo(1件1ファイル)</span>

@@ -229,18 +229,23 @@ function sessionSettings(t) {
   const gitDirs = [path.join(HUB, '.git'), ...repos.map((r) => path.join(r, '.git'))];
   const creds = [...new Set([path.join(os.homedir(), '.claude'), ...profiles().map((n) => fs.realpathSync(P.profile(n)))])].map((d) => path.join(d, '.credentials.json'));
   const abs = (p) => `/${p}`; // 権限のルールでは // で始めると絶対パスになる
+  // hub リポジトリ自体が作業の対象になることがあるので、.git だけは外して、中身を1つずつ禁止する。
+  // Edit の禁止はサンドボックスの書き込み禁止にも反映されるので、ここでも .git を外す。
+  const kit = fs.readdirSync(KIT).filter((n) => n !== '.git').map((n) => path.join(KIT, n));
+  const tree = (p) => (fs.statSync(p).isDirectory() ? `${abs(p)}/**` : abs(p));
   return {
     permissions: {
+      // 作業のフォルダの外でも、hub の配下(プロファイルを除く)は Read の道具で読めるようにする。
+      allow: [KIT, HUB, path.join(ROOT, 'repos'), WORK].map((d) => `Read(${abs(d)}/**)`),
       // 承認の記録は、読めるが書けないようにする。Read を禁止すると、サンドボックスの中では空の場所に差し替わり、
       // 書き込みが通ったように見えてしまう。
-      deny: [`Edit(${abs(APPROVALS)}/**)`, ...creds.map((c) => `Read(${abs(c)})`), `Edit(${abs(KIT)}/**)`, 'Bash(git push*)', 'Bash(hub gate approve*)'],
+      deny: [`Edit(${abs(APPROVALS)}/**)`, ...creds.map((c) => `Read(${abs(c)})`), ...kit.map((p) => `Edit(${tree(p)})`), 'Bash(git push*)', 'Bash(hub gate approve*)'],
     },
     sandbox: {
       enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true,
       filesystem: {
         allowWrite: [HUB, ...repos.map((r) => path.join(r, '.git'))],
-        // hub リポジトリ自体が作業の対象になることがあるので、.git だけは外して、中身を1つずつ禁止する。
-        denyWrite: [APPROVALS, ...fs.readdirSync(KIT).filter((n) => n !== '.git').map((n) => path.join(KIT, n)),
+        denyWrite: [APPROVALS, ...kit,
           ...gitDirs.flatMap((g) => [path.join(g, 'config'), path.join(g, 'hooks')])],
         denyRead: creds,
       },
