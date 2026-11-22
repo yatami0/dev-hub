@@ -9,6 +9,8 @@
 - 人が見る資料(進捗・判断・調査・図解)は HTML で `~/dev/data/tasks/<作業ID>/` に置き、`hub record add` で登録する。
 - 引っかかったこと・後でやることは `hub todo add --text "..."` に残す。
 - 作業を終了するときは `hub task close`。作業場は `hub ws remove` で削除する(未反映の変更があれば削除されない)。
-- 次の操作は人の承認が要る。必要になると分かった時点で `hub gate add` で登録しておく: push / 記録の確定 / 公開 / 未反映の変更がある作業場の強制削除 / リモートの作成・削除。
-- `hub gate approve` は人だけが実行する。Claude は実行しない。承認待ちで止まったら、承認ゲートの ID を伝えて待つ。
+- 次の操作は人の承認が要る: push / 記録の確定 / 公開 / 未反映の変更がある作業場の強制削除 / リモートの作成・削除。
+- 承認が要る操作は、Claude は実行しない。承認待ちに登録して止まる。push は `hub push <作業場ID>`、記録の確定は `hub record confirm <記録ID>`、強制削除は `hub ws remove <作業場ID> --force`、それ以外は `hub gate add`。`git push` を直接実行しない。
+- `hub gate approve` は人だけが実行する。人が承認すると、hub がその操作を実行する。承認待ちで止まったら、承認ゲートの ID を伝えて待つ。
+- セッションは `hub session start --task <作業ID> --prompt "..."` で起動し、続きは `hub session resume <セッションID> --prompt "..."` で渡す。
 - hub リポジトリ自体を直すのは、仕組みを直す作業として頼まれたときだけ。

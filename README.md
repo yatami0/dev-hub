@@ -18,9 +18,22 @@ hub status
 `init` がやること:
 
 - データリポジトリ `~/dev/data` を作る(ローカルの Git で履歴を持つ)
-- `~/dev/repos` と `~/dev/work` を作る
+- `~/dev/repos`、`~/dev/work`、`~/dev/profiles`、`~/dev/data/approvals` を作る
 - `hub` コマンドを `~/.local/bin` につなぐ
 - Claude Code 向けのルール `~/dev/CLAUDE.md` をつなぐ
 - `--with-permissions` を付けると、push などを毎回人に確認する設定を `~/.claude/settings.json` に足す
+
+## プロファイルとセッション
+
+セッションの起動には、Claude Code、bubblewrap、socat が要る(`sudo apt-get install bubblewrap socat`)。
+
+```bash
+hub profile add default
+CLAUDE_CONFIG_DIR=~/dev/profiles/default claude auth login
+hub session start --task <作業ID> --prompt "..."
+```
+
+既にある設定フォルダをそのままプロファイルにするときは `hub profile add default --path ~/.claude`。
+セッションに渡している設定は `hub session settings --task <作業ID>` で見られる。
 
 置き場を変えるときは、環境変数 `HUB_ROOT` に `~/dev` の代わりの場所を入れる。

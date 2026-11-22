@@ -12,18 +12,22 @@ const ROOT = process.env.HUB_ROOT || path.join(os.homedir(), 'dev');
 const HUB = path.join(ROOT, 'data'); // データリポジトリ。仕組み(このリポジトリ)とは別に、環境ごとに持つ
 const KIT = path.dirname(path.dirname(fs.realpathSync(process.argv[1])));
 const WORK = path.join(ROOT, 'work');
+const APPROVALS = path.join(HUB, 'approvals'); // 承認の記録。セッションからは書けない場所にする
+const PROFILES = path.join(ROOT, 'profiles'); // プロファイル。Git の管理の外に置く
+const DEFAULT_PROFILE = 'default';
 const SCHEMA = 1;
 
 const TASK = { active: '進行中', closed: '終了', tidied: '片付け済み' };
 const REC = { draft: '下書き', confirmed: '確定', shared: '公開' };
 const KINDS = ['進捗', '判断', '調査', '図解'];
 const TODO = { open: '未着手', promoted: '作業化済み', done: '完了', dropped: '捨てた' };
-const GATE = { pending: '承認待ち', approved: '承認済み' };
+const GATE = { pending: '承認待ち', approved: '承認済み', done: '実行済み' };
 const ACTIONS = ['push', '確定', '公開', '作業場の強制削除', 'リモートの作成・削除'];
 
 // ---------- 小道具 ----------
 const fail = (msg) => { console.error(`エラー: ${msg}`); process.exit(1); };
 const today = () => new Date().toLocaleDateString('sv-SE');
+const now = () => new Date().toLocaleString('sv-SE');
 const expand = (p) => path.resolve(p.startsWith('~') ? path.join(os.homedir(), p.slice(1)) : p);
 const sleep = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
 
@@ -53,7 +57,7 @@ const listJson = (dir) => (fs.existsSync(dir)
   : []);
 
 function git(cwd, ...args) {
-  return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+  return execFileSync('git', ['-C', cwd, '-c', 'core.hooksPath=/dev/null', '-c', 'core.fsmonitor=false', ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 }
 const gitOk = (cwd, ...args) => { try { git(cwd, ...args); return true; } catch { return false; } };
 
@@ -84,6 +88,9 @@ const P = {
   ws: (t, id) => path.join(HUB, 'tasks', t, 'workspaces', `${id}.json`),
   rec: (t, id) => path.join(HUB, 'tasks', t, 'records', `${id}.json`),
   gate: (t, id) => path.join(HUB, 'tasks', t, 'gates', `${id}.json`),
+  sess: (t, id) => path.join(HUB, 'tasks', t, 'sessions', `${id}.json`),
+  approval: (id) => path.join(APPROVALS, `${id}.json`),
+  profile: (name) => path.join(PROFILES, name),
   todo: (id) => path.join(HUB, 'todos', `${id}.json`),
   repo: (id) => path.join(HUB, 'repos', `${id}.json`),
 };
@@ -106,12 +113,20 @@ const getTask = (id) => (fs.existsSync(P.task(id)) ? readJson(P.task(id)) : fail
 const getRepo = (id) => (fs.existsSync(P.repo(id)) ? readJson(P.repo(id)) : fail(`リポジトリ ${id} が登録されていません`));
 const wsOf = (t) => listJson(path.join(P.taskDir(t), 'workspaces'));
 const recOf = (t) => listJson(path.join(P.taskDir(t), 'records'));
-const gateOf = (t) => listJson(path.join(P.taskDir(t), 'gates'));
+// 承認ゲートの状態は、承認の記録から決める。承認ゲートのファイルに書かれた status は信用しない。
+function gateStatus(g) {
+  if (!fs.existsSync(P.approval(g.id))) return GATE.pending;
+  const a = readJson(P.approval(g.id));
+  if (a.action !== g.action || a.target !== g.target) return GATE.pending;
+  return a.executed_at ? GATE.done : GATE.approved;
+}
+const gateOf = (t) => listJson(path.join(P.taskDir(t), 'gates')).map((g) => ({ ...g, status: gateStatus(g) }));
+const sessOf = (t) => listJson(path.join(P.taskDir(t), 'sessions'));
 const allTodos = () => listJson(path.join(HUB, 'todos'));
 
 function findIn(kind, id) {
   for (const t of allTasks()) {
-    const hit = (kind === 'ws' ? wsOf(t.id) : kind === 'rec' ? recOf(t.id) : gateOf(t.id)).find((x) => x.id === id);
+    const hit = (kind === 'ws' ? wsOf(t.id) : kind === 'rec' ? recOf(t.id) : kind === 'sess' ? sessOf(t.id) : gateOf(t.id)).find((x) => x.id === id);
     if (hit) return hit;
   }
   return fail(`${id} がありません`);
@@ -136,17 +151,123 @@ function wsCheck(w) {
   return { exists: true, uncommitted, ahead, clean: uncommitted === 0 && ahead === 0 };
 }
 
-// 承認済みの承認ゲートが無ければ、承認待ちの承認ゲートを作って止まる。
-function requireGate(taskId, action, target) {
-  const gates = gateOf(taskId).filter((g) => g.action === action && g.target === target);
-  if (gates.some((g) => g.status === GATE.approved)) return;
-  let g = gates.find((x) => x.status === GATE.pending);
+// まだ実行していない承認ゲートが無ければ、承認待ちとして登録する。実行は、人が承認したときに hub が行う。
+function ensureGate(taskId, action, target) {
+  let g = gateOf(taskId).find((x) => x.action === action && x.target === target && x.status !== GATE.done);
   if (!g) {
     g = { schema: SCHEMA, id: newId('g', (i) => fs.existsSync(P.gate(taskId, i))), task_id: taskId, action, target, status: GATE.pending };
     writeJson(P.gate(taskId, g.id), g);
     commit([P.gate(taskId, g.id)], `gate: ${action} ${target} の承認待ち`);
   }
-  fail(`人の承認が必要です。承認待ち: ${g.id}(${action} / ${target})`);
+  return g;
+}
+const queued = (g) => console.log(g.status === GATE.pending
+  ? `承認待ちに登録しました: ${g.id}(${g.action} / ${g.target})。人が承認すると hub が実行します`
+  : `承認済みです: ${g.id}。hub gate approve ${g.id} で実行されます`);
+
+// ---------- プロファイル ----------
+// プロファイルはデータとして保存しない。フォルダを見て読み取る。
+const profiles = () => (fs.existsSync(PROFILES) ? fs.readdirSync(PROFILES).sort().filter((n) => fs.statSync(P.profile(n), { throwIfNoEntry: false })?.isDirectory()) : []);
+const checkProfile = (name) => (profiles().includes(name) ? name : fail(`プロファイル ${name} がありません。作るには: hub profile add ${name}`));
+const profileOf = (t) => t.profile || DEFAULT_PROFILE;
+
+function newTask(opt, title, purpose) {
+  if (opt.parent) getTask(opt.parent);
+  if (typeof opt.profile === 'string') checkProfile(opt.profile);
+  return {
+    schema: SCHEMA, id: newId('t', (i) => fs.existsSync(P.task(i))), parent_id: opt.parent || '',
+    title, purpose, status: TASK.active, absorbed_into: '', created_at: today(), closed_at: '',
+    profile: typeof opt.profile === 'string' ? opt.profile : '',
+  };
+}
+
+// ---------- 承認されたときに hub が実行する操作 ----------
+function doPush(w) {
+  const r = getRepo(w.repo_id);
+  if (!r.remote_url) throw new Error(`リポジトリ ${r.id} はローカルのみです(remote_url が空)`);
+  if (!fs.existsSync(w.path)) throw new Error(`作業場 ${w.id} の実体がありません`);
+  console.log(`push: ${r.remote_url} ${w.branch}`);
+  git(w.path, 'push', r.remote_url, `${w.branch}:${w.branch}`);
+}
+function doConfirm(r) {
+  if (r.status !== REC.draft) throw new Error(`記録 ${r.id} は既に ${r.status} です`);
+  r.status = REC.confirmed;
+  writeJson(P.rec(r.task_id, r.id), r);
+  commit([P.rec(r.task_id, r.id)], `record: ${r.id} 確定`);
+  console.log(`記録 ${r.id} を確定にしました`);
+  tidyIfDone(r.task_id);
+}
+function doRemove(w, force) {
+  const r = getRepo(w.repo_id);
+  if (fs.existsSync(w.path)) git(r.path, 'worktree', 'remove', ...(force ? ['--force'] : []), w.path);
+  gitOk(r.path, 'worktree', 'prune');
+  gitOk(r.path, 'branch', '-D', w.branch);
+  fs.rmSync(P.ws(w.task_id, w.id));
+  try { fs.rmdirSync(path.dirname(w.path)); } catch { /* 他の作業場が残っている */ }
+  commit([P.ws(w.task_id, w.id)], `ws: ${w.id} 片付け`);
+  console.log(`作業場 ${w.id} を削除しました`);
+  tidyIfDone(w.task_id);
+}
+// 承認ゲートの対象を、操作ごとに確かめる。
+function gateTarget(taskId, action, target) {
+  if (action === 'push' || action === '作業場の強制削除') return wsOf(taskId).find((w) => w.id === target) || fail(`対象は、この作業の作業場の ID にしてください: ${target}`);
+  if (action === '確定' || action === '公開') return recOf(taskId).find((r) => r.id === target) || fail(`対象は、この作業の記録の ID にしてください: ${target}`);
+  return target;
+}
+
+// ---------- セッション ----------
+// セッションに渡す設定。サンドボックス(Bash)と禁止の設定(Read / Edit / Write)の両方で、
+// 認証情報の置き場と承認の記録を守る。
+function sessionSettings(t) {
+  fs.mkdirSync(APPROVALS, { recursive: true });
+  const repos = [...new Set(wsOf(t.id).map((w) => getRepo(w.repo_id).path))];
+  const gitDirs = [path.join(HUB, '.git'), ...repos.map((r) => path.join(r, '.git'))];
+  const creds = [...new Set([path.join(os.homedir(), '.claude'), ...profiles().map((n) => fs.realpathSync(P.profile(n)))])].map((d) => path.join(d, '.credentials.json'));
+  const abs = (p) => `/${p}`; // 権限のルールでは // で始めると絶対パスになる
+  return {
+    permissions: {
+      // 承認の記録は、読めるが書けないようにする。Read を禁止すると、サンドボックスの中では空の場所に差し替わり、
+      // 書き込みが通ったように見えてしまう。
+      deny: [`Edit(${abs(APPROVALS)}/**)`, ...creds.map((c) => `Read(${abs(c)})`), `Edit(${abs(KIT)}/**)`, 'Bash(git push*)', 'Bash(hub gate approve*)'],
+    },
+    sandbox: {
+      enabled: true, failIfUnavailable: true, allowUnsandboxedCommands: false, autoAllowBashIfSandboxed: true,
+      filesystem: {
+        allowWrite: [HUB, ...repos.map((r) => path.join(r, '.git'))],
+        denyWrite: [APPROVALS, KIT, ...gitDirs.flatMap((g) => [path.join(g, 'config'), path.join(g, 'hooks')])],
+        denyRead: creds,
+      },
+    },
+  };
+}
+
+function runSession(s, prompt, opt) {
+  const t = getTask(s.task_id);
+  const note = `あなたは作業 ${t.id}「${t.title}」を担当しています。目的: ${t.purpose}。対話なしで動いているので、人に確認はできません。push などの承認が要る操作は hub コマンドで承認待ちに登録し、そこで止まってください。`;
+  const args = ['-p', prompt, '--output-format', 'json', '--settings', JSON.stringify(sessionSettings(t)),
+    '--permission-mode', 'acceptEdits', '--add-dir', P.taskDir(t.id), '--append-system-prompt', note];
+  if (s.claude_session_id) args.push('--resume', s.claude_session_id);
+  const env = Object.fromEntries(Object.entries(process.env).filter(([k]) => !/^(CLAUDE|ANTHROPIC)/.test(k)));
+  Object.assign(env, { CLAUDE_CONFIG_DIR: fs.realpathSync(P.profile(s.profile)), HUB_ROOT: ROOT, HUB_SESSION: '1' });
+  let out;
+  try {
+    out = execFileSync('claude', args, { cwd: s.cwd, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'], maxBuffer: 256 * 1024 * 1024 });
+  } catch (e) { out = e.stdout || fail(`セッションを起動できませんでした: ${e.message}`); }
+  let j;
+  try { j = JSON.parse(out); } catch { fail(`セッションの結果を読めませんでした: ${out.slice(0, 300)}`); }
+  if (!s.claude_session_id && j.session_id) {
+    s.claude_session_id = j.session_id;
+    writeJson(P.sess(s.task_id, s.id), s);
+    commit([P.sess(s.task_id, s.id)], `session: ${s.id} 開始`);
+  }
+  // 拒否があってもエラーにはならないので、拒否された操作の一覧を必ず返す。
+  const denied = (j.permission_denials || []).map((d) => ({ tool: d.tool_name, input: d.tool_input.command || d.tool_input.file_path || '' }));
+  if (opt.json) console.log(JSON.stringify({ session: s, is_error: !!j.is_error, result: j.result, denied }, null, 2));
+  else {
+    console.log(`${s.id}  ${j.is_error ? '[エラー]' : '[完了]'}\n${j.result}`);
+    if (denied.length) console.log(`\n拒否された操作(${denied.length} 件):\n${denied.map((d) => `  ${d.tool}: ${d.input}`).join('\n')}`);
+  }
+  if (j.is_error) process.exit(1);
 }
 
 function tidyIfDone(taskId) {
@@ -182,7 +303,7 @@ const cmd = {
       git(HUB, 'commit', '-q', '-m', 'データリポジトリを開始');
       console.log(`データリポジトリを作りました: ${HUB}`);
     } else console.log(`データリポジトリは既にあります: ${HUB}`);
-    for (const d of ['repos', 'work']) fs.mkdirSync(path.join(ROOT, d), { recursive: true });
+    for (const d of ['repos', 'work', 'profiles', path.join('data', 'approvals')]) fs.mkdirSync(path.join(ROOT, d), { recursive: true });
     link(path.join(KIT, 'CLAUDE.md'), path.join(ROOT, 'CLAUDE.md'));
     link(path.join(KIT, 'tool', 'hub.mjs'), path.join(os.homedir(), '.local', 'bin', 'hub'));
     if (!opt['with-permissions']) return console.log('承認の強制は入れていません。入れるなら: hub init --with-permissions');
@@ -196,12 +317,7 @@ const cmd = {
   },
 
   'task new'({ opt }) {
-    if (opt.parent) getTask(opt.parent);
-    const t = {
-      schema: SCHEMA, id: newId('t', (i) => fs.existsSync(P.task(i))), parent_id: opt.parent || '',
-      title: need(opt, 'title'), purpose: need(opt, 'purpose'), status: TASK.active,
-      absorbed_into: '', created_at: today(), closed_at: '',
-    };
+    const t = newTask(opt, need(opt, 'title'), need(opt, 'purpose'));
     writeJson(P.task(t.id), t);
     commit([P.task(t.id)], `task: ${t.id} ${t.title}`);
     console.log(t.id);
@@ -221,16 +337,18 @@ const cmd = {
     const data = {
       task: t, children: allTasks().filter((c) => c.parent_id === t.id),
       workspaces: wsOf(t.id).map((w) => ({ ...w, check: wsCheck(w) })),
-      records: recOf(t.id), gates: gateOf(t.id), todos: allTodos().filter((d) => d.origin_task_id === t.id),
+      records: recOf(t.id), gates: gateOf(t.id), sessions: sessOf(t.id), todos: allTodos().filter((d) => d.origin_task_id === t.id),
     };
     if (opt.json) return console.log(JSON.stringify(data, null, 2));
     console.log(`${t.id}  [${t.status}]  ${t.title}\n  目的: ${t.purpose}`);
+    console.log(`  プロファイル: ${profileOf(t)}`);
     if (t.parent_id) console.log(`  親: ${t.parent_id}`);
     if (t.absorbed_into) console.log(`  吸収先: ${t.absorbed_into}`);
     data.children.forEach((c) => console.log(`  子: ${c.id} [${c.status}] ${c.title}`));
     data.workspaces.forEach((w) => console.log(`  作業場: ${w.id} ${w.repo_id}/${w.branch} → ${w.check.exists ? (w.check.clean ? '削除してよい' : `未反映あり(未コミット ${w.check.uncommitted} / 未取り込み ${w.check.ahead})`) : '実体なし'}`));
     data.records.forEach((r) => console.log(`  記録: ${r.id} [${r.status}] ${r.kind} ${r.title}`));
     data.gates.forEach((g) => console.log(`  承認ゲート: ${g.id} [${g.status}] ${g.action} / ${g.target}`));
+    data.sessions.forEach((x) => console.log(`  セッション: ${x.id} ${x.started_at} ${x.cwd}`));
     data.todos.filter((d) => d.status === TODO.open).forEach((d) => console.log(`  ToDo: ${d.id} ${d.text}`));
   },
   'task close'({ pos, opt }) {
@@ -263,20 +381,22 @@ const cmd = {
     if (!gitOk(p, 'rev-parse', '--git-dir')) fail(`${p} は Git リポジトリではありません`);
     let remote = typeof opt.remote === 'string' ? opt.remote : '';
     if (!remote) { try { remote = git(p, 'remote', 'get-url', 'origin'); } catch { remote = ''; } }
-    writeJson(P.repo(id), { schema: SCHEMA, id, remote_url: remote, path: p });
+    if (typeof opt.profile === 'string') checkProfile(opt.profile);
+    writeJson(P.repo(id), { schema: SCHEMA, id, remote_url: remote, path: p, profile: typeof opt.profile === 'string' ? opt.profile : '' });
     commit([P.repo(id)], `repo: ${id}`);
     console.log(`${id} を登録しました(${remote ? 'リモートあり' : 'ローカルのみ'})`);
   },
   'repo list'({ opt }) {
     const rs = listJson(path.join(HUB, 'repos'));
     if (opt.json) return console.log(JSON.stringify(rs, null, 2));
-    rs.forEach((r) => console.log(`${r.id}  ${r.remote_url || '(ローカルのみ)'}  ${r.path}`));
+    rs.forEach((r) => console.log(`${r.id}  ${r.remote_url || '(ローカルのみ)'}  ${r.path}${r.profile ? `  プロファイル: ${r.profile}` : ''}`));
   },
 
   'ws new'({ opt }) {
     const t = getTask(taskArg(opt));
     if (t.status !== TASK.active) fail(`作業 ${t.id} は ${t.status} なので作業場を作れません`);
     const r = getRepo(need(opt, 'repo'));
+    if (r.profile && r.profile !== profileOf(t)) fail(`リポジトリ ${r.id} はプロファイル ${r.profile} 用です。この作業のプロファイルは ${profileOf(t)} です`);
     const branch = need(opt, 'branch');
     const base = typeof opt.base === 'string' ? opt.base : git(r.path, 'symbolic-ref', '--short', 'HEAD');
     const dest = path.join(WORK, t.id, r.id);
@@ -297,19 +417,15 @@ const cmd = {
   'ws remove'({ pos, opt }) {
     const w = findIn('ws', pos[0] || fail('作業場の IDが必要です'));
     const c = wsCheck(w);
-    if (!c.clean) {
-      if (!opt.force) fail(`未反映の変更があります(未コミット ${c.uncommitted} / 未取り込み ${c.ahead})。それでも削除するなら --force(人の承認が要ります)`);
-      requireGate(w.task_id, '作業場の強制削除', w.id);
-    }
-    const r = getRepo(w.repo_id);
-    if (c.exists) git(r.path, 'worktree', 'remove', ...(opt.force ? ['--force'] : []), w.path);
-    gitOk(r.path, 'worktree', 'prune');
-    gitOk(r.path, 'branch', '-D', w.branch);
-    fs.rmSync(P.ws(w.task_id, w.id));
-    try { fs.rmdirSync(path.dirname(w.path)); } catch { /* 他の作業場が残っている */ }
-    commit([P.ws(w.task_id, w.id)], `ws: ${w.id} 片付け`);
-    console.log(`作業場 ${w.id} を削除しました`);
-    tidyIfDone(w.task_id);
+    if (c.clean) return doRemove(w, false);
+    if (!opt.force) fail(`未反映の変更があります(未コミット ${c.uncommitted} / 未取り込み ${c.ahead})。それでも削除するなら --force(人の承認が要ります)`);
+    queued(ensureGate(w.task_id, '作業場の強制削除', w.id));
+  },
+  // push は hub が実行する。ここでは承認待ちに登録するだけ。
+  push({ pos }) {
+    const w = findIn('ws', pos[0] || fail('作業場の IDが必要です'));
+    if (!getRepo(w.repo_id).remote_url) fail(`リポジトリ ${w.repo_id} はローカルのみです`);
+    queued(ensureGate(w.task_id, 'push', w.id));
   },
 
   'record add'({ opt }) {
@@ -334,18 +450,15 @@ const cmd = {
   'record confirm'({ pos }) {
     const r = findIn('rec', pos[0] || fail('記録の IDが必要です'));
     if (r.status !== REC.draft) fail(`記録 ${r.id} は既に ${r.status} です`);
-    requireGate(r.task_id, '確定', r.id);
-    r.status = REC.confirmed;
-    writeJson(P.rec(r.task_id, r.id), r);
-    commit([P.rec(r.task_id, r.id)], `record: ${r.id} 確定`);
-    console.log(`記録 ${r.id} を確定にしました`);
-    tidyIfDone(r.task_id);
+    queued(ensureGate(r.task_id, '確定', r.id));
   },
+  // 公開そのものは hub の外で行う。承認済みのときだけ、URL を記録する。
   'record share'({ pos, opt }) {
     const r = findIn('rec', pos[0] || fail('記録の IDが必要です'));
     if (r.status !== REC.confirmed) fail(`公開できるのは確定した記録だけです(今は ${r.status})`);
     const url = need(opt, 'url');
-    requireGate(r.task_id, '公開', r.id);
+    const g = ensureGate(r.task_id, '公開', r.id);
+    if (g.status !== GATE.approved) return queued(g);
     r.status = REC.shared; r.published_url = url;
     writeJson(P.rec(r.task_id, r.id), r);
     commit([P.rec(r.task_id, r.id)], `record: ${r.id} 公開`);
@@ -386,12 +499,7 @@ const cmd = {
     if (!fs.existsSync(f)) fail(`ToDo ${pos[0]} がありません`);
     const d = readJson(f);
     if (d.status !== TODO.open) fail(`ToDo ${d.id} は既に ${d.status} です`);
-    if (opt.parent) getTask(opt.parent);
-    const t = {
-      schema: SCHEMA, id: newId('t', (i) => fs.existsSync(P.task(i))), parent_id: opt.parent || '',
-      title: typeof opt.title === 'string' ? opt.title : d.text, purpose: typeof opt.purpose === 'string' ? opt.purpose : d.text,
-      status: TASK.active, absorbed_into: '', created_at: today(), closed_at: '',
-    };
+    const t = newTask(opt, typeof opt.title === 'string' ? opt.title : d.text, typeof opt.purpose === 'string' ? opt.purpose : d.text);
     d.status = TODO.promoted; d.promoted_to = t.id;
     writeJson(P.task(t.id), t); writeJson(f, d);
     commit([P.task(t.id), f], `todo: ${d.id} を作業 ${t.id} に`);
@@ -404,10 +512,8 @@ const cmd = {
     const t = getTask(taskArg(opt));
     const action = need(opt, 'action');
     if (!ACTIONS.includes(action)) fail(`--action は ${ACTIONS.join(' / ')} のどれかです`);
-    const g = { schema: SCHEMA, id: newId('g', (i) => fs.existsSync(P.gate(t.id, i))), task_id: t.id, action, target: need(opt, 'target'), status: GATE.pending };
-    writeJson(P.gate(t.id, g.id), g);
-    commit([P.gate(t.id, g.id)], `gate: ${action} ${g.target} の承認待ち`);
-    console.log(g.id);
+    gateTarget(t.id, action, need(opt, 'target'));
+    console.log(ensureGate(t.id, action, opt.target).id);
   },
   'gate list'({ opt }) {
     let gs = allTasks().flatMap((t) => gateOf(t.id));
@@ -415,19 +521,80 @@ const cmd = {
     if (opt.json) return console.log(JSON.stringify(gs, null, 2));
     gs.forEach((g) => console.log(`${g.id}  ${g.task_id}  [${g.status}]  ${g.action} / ${g.target}`));
   },
-  // 人だけが実行する。Claude Code 側では権限設定で毎回確認にしてある。
+  // 人だけが実行する。承認を記録し、続けてその操作を hub が実行する。
+  // 承認の記録は、セッションからは書けない場所にある。
   'gate approve'({ pos }) {
+    if (process.env.HUB_SESSION) fail('セッションの中からは承認できません');
     const g = findIn('gate', pos[0] || fail('承認ゲートの IDが必要です'));
-    g.status = GATE.approved;
-    writeJson(P.gate(g.task_id, g.id), g);
-    commit([P.gate(g.task_id, g.id)], `gate: ${g.id} 承認`);
+    if (g.status === GATE.done) fail(`承認ゲート ${g.id} は実行済みです`);
+    const target = gateTarget(g.task_id, g.action, g.target);
+    const a = g.status === GATE.approved ? readJson(P.approval(g.id))
+      : { schema: SCHEMA, gate_id: g.id, action: g.action, target: g.target, approved_at: now(), executed_at: '' };
+    const save = (status) => {
+      writeJson(P.approval(g.id), a);
+      writeJson(P.gate(g.task_id, g.id), { ...g, status });
+      commit([P.approval(g.id), P.gate(g.task_id, g.id)], `gate: ${g.id} ${status}`);
+    };
+    save(GATE.approved);
     console.log(`承認ゲート ${g.id} を承認しました(${g.action} / ${g.target})`);
+    try {
+      if (g.action === 'push') doPush(target);
+      else if (g.action === '確定') doConfirm(target);
+      else if (g.action === '作業場の強制削除') doRemove(target, true);
+      else return console.log('この操作は hub の外で実行します。');
+    } catch (e) {
+      fail(`承認は記録しましたが、実行に失敗しました: ${String(e.stderr || e.message).trim()}\nもう一度 hub gate approve ${g.id} で再実行できます`);
+    }
+    a.executed_at = now();
+    save(GATE.done);
+    console.log('実行しました');
   },
   'gate check'({ opt }) {
-    const t = taskArg(opt);
-    const ok = gateOf(t).some((g) => g.action === need(opt, 'action') && g.target === need(opt, 'target') && g.status === GATE.approved);
-    if (!ok) requireGate(t, need(opt, 'action'), need(opt, 'target'));
-    console.log('承認済み');
+    const g = ensureGate(taskArg(opt), need(opt, 'action'), need(opt, 'target'));
+    console.log(`${g.id}  ${g.status}`);
+    if (g.status !== GATE.approved) process.exit(1);
+  },
+
+  'profile list'({ opt }) {
+    const rows = profiles().map((n) => ({ name: n, path: fs.realpathSync(P.profile(n)), logged_in: fs.existsSync(path.join(P.profile(n), '.credentials.json')) }));
+    if (opt.json) return console.log(JSON.stringify(rows, null, 2));
+    rows.forEach((p) => console.log(`${p.name}${p.name === DEFAULT_PROFILE ? '(既定)' : ''}  ${p.logged_in ? 'ログイン済み' : '未ログイン'}  ${p.path}`));
+  },
+  // 空のプロファイルを作る。--path を付けると、既にある設定フォルダをそのままプロファイルにする。
+  'profile add'({ pos, opt }) {
+    const name = pos[0] || fail('プロファイルの名前が必要です');
+    if (!/^[\w-]+$/.test(name)) fail('プロファイルの名前は英数字と - _ だけにしてください');
+    if (fs.lstatSync(P.profile(name), { throwIfNoEntry: false })) fail(`プロファイル ${name} は既にあります`);
+    fs.mkdirSync(PROFILES, { recursive: true });
+    if (typeof opt.path === 'string') {
+      const src = expand(opt.path);
+      if (!fs.existsSync(src)) fail(`${src} がありません`);
+      fs.symlinkSync(src, P.profile(name));
+    } else fs.mkdirSync(P.profile(name));
+    console.log(`プロファイル ${name} を作りました: ${P.profile(name)}`);
+    if (!fs.existsSync(path.join(P.profile(name), '.credentials.json'))) console.log(`ログイン(人がやる): CLAUDE_CONFIG_DIR=${P.profile(name)} claude auth login`);
+  },
+
+  // 対話なしで Claude Code のセッションを起動する。作業場を指定しなければ、作業のフォルダで動く。
+  'session start'({ opt }) {
+    const t = getTask(taskArg(opt));
+    if (t.status !== TASK.active) fail(`作業 ${t.id} は ${t.status} なのでセッションを起動できません`);
+    const cwd = typeof opt.ws === 'string' ? (wsOf(t.id).find((w) => w.id === opt.ws) || fail(`作業場 ${opt.ws} はこの作業にありません`)).path : P.taskDir(t.id);
+    const s = { schema: SCHEMA, id: newId('s', (i) => fs.existsSync(P.sess(t.id, i))), task_id: t.id, profile: checkProfile(profileOf(t)), cwd, started_at: now(), claude_session_id: '' };
+    runSession(s, need(opt, 'prompt'), opt);
+  },
+  'session resume'({ pos, opt }) {
+    const s = findIn('sess', pos[0] || fail('セッションの IDが必要です'));
+    checkProfile(s.profile);
+    runSession(s, need(opt, 'prompt'), opt);
+  },
+  // セッションに渡す設定を表示する。何を止めているかを人が確かめるためのもの。
+  'session settings'({ opt }) { console.log(JSON.stringify(sessionSettings(getTask(taskArg(opt))), null, 2)); },
+  'session list'({ opt }) {
+    const tasks = typeof opt.task === 'string' ? [getTask(opt.task)] : allTasks();
+    const rows = tasks.flatMap((t) => sessOf(t.id));
+    if (opt.json) return console.log(JSON.stringify(rows, null, 2));
+    rows.forEach((x) => console.log(`${x.id}  ${x.task_id}  ${x.profile}  ${x.started_at}  ${x.cwd}`));
   },
 
   status({ opt }) {

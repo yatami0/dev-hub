@@ -128,6 +128,9 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td>記録</td><td>作業から出た、人が見る HTML。種類は進捗・判断・調査・図解</td></tr>
     <tr><td>ToDo</td><td>作業にする前のものを置く場所。作業にする、そのまま済ませる、捨てる、のどれかになる</td></tr>
     <tr><td>承認ゲート</td><td>人の承認が要る操作を、1件ずつ登録したもの</td></tr>
+    <tr><td>承認の記録</td><td>人が承認ゲートを承認したことを残すファイル。セッションからは書けない場所に置く</td></tr>
+    <tr><td>プロファイル</td><td>Claude Code の設定フォルダ1つ。「何を使えるか」と「誰として動くか」を決める</td></tr>
+    <tr><td>セッション</td><td>hub が対話なしで起動した Claude Code の実行1つ。再開して続きの指示を渡せる</td></tr>
     <tr><td>リポジトリ</td><td>コードの入れ物。GitHub にあるものと、ローカルのみのものがある</td></tr>
     <tr><td>未反映の変更</td><td>作業場にだけある変更。未コミットの変更と、元のブランチに入っていないコミットを指す</td></tr>
     <tr><td>終了 / 片付け</td><td>終了は、作業の状態を変えること。片付けは、終了した作業の作業場と下書きを整理すること</td></tr>
@@ -179,7 +182,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="model">
   <h2>6つのデータ</h2>
-  <p>持つデータは6種類です。矢印は「持つ」または「指す」の向きで、どれも1件に対して複数がぶら下がります。</p>
+  <p>中心になるデータは6種類です。このほかに、hub が起動した実行を残す「セッション」があります(「項目の定義」を参照)。矢印は「持つ」または「指す」の向きで、どれも1件に対して複数がぶら下がります。</p>
   <div class="fig">
     <svg viewBox="0 0 720 372" role="img" aria-label="ToDo は作業になる。作業は親子関係を持ち、作業場、記録、承認ゲートを持つ。作業場はリポジトリを指す。">
       <g class="n-rec"><rect x="40" y="60" width="170" height="54" rx="8"/><text class="t1" x="125" y="83" text-anchor="middle">ToDo</text><text class="t2" x="125" y="102" text-anchor="middle">作業の種</text></g>
@@ -223,6 +226,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
       <tr><td class="f">absorbed_into</td><td>別の作業に吸収された場合、その吸収先</td><td>空</td></tr>
       <tr><td class="f">created_at</td><td>作った日時</td><td class="f">2026-11-22</td></tr>
       <tr><td class="f">closed_at</td><td>終了した日時</td><td>空</td></tr>
+      <tr><td class="f">profile</td><td>どのプロファイルで動かすか。空なら既定の <code>default</code></td><td>空</td></tr>
     </table></div>
   </div>
 
@@ -261,6 +265,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
       <tr><td class="f">id</td><td>リポジトリの ID</td><td class="f">PoC</td></tr>
       <tr><td class="f">remote_url</td><td>GitHub の場所。空ならローカルのみ(失ってよいもの)</td><td class="f">github.com/yatami0/PoC</td></tr>
       <tr><td class="f">path</td><td>ローカルの場所</td><td class="f">~/dev/repos/PoC</td></tr>
+      <tr><td class="f">profile</td><td>このリポジトリで使ってよいプロファイル。空ならどれでもよい</td><td>空</td></tr>
     </table></div>
   </div>
 
@@ -278,16 +283,38 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   </div>
 
   <div class="entity">
-    <h3>承認ゲート <span class="mono">gate</span> <span class="tag prop">提案</span></h3>
+    <h3>承認ゲート <span class="mono">gate</span></h3>
     <div class="tbl"><table>
       <tr><th>項目</th><th>意味</th><th>例</th></tr>
       <tr><td class="f">id</td><td>承認ゲートの ID</td><td class="f">g-20261122-b12</td></tr>
       <tr><td class="f">task_id</td><td>どの作業の承認ゲートか</td><td class="f">t-20261122-a3f</td></tr>
       <tr><td class="f">action</td><td>何をする前の承認か</td><td>push</td></tr>
-      <tr><td class="f">target</td><td>対象</td><td class="f">PoC / auth-common</td></tr>
-      <tr><td class="f">status</td><td>承認待ち / 承認済み</td><td>承認待ち</td></tr>
+      <tr><td class="f">target</td><td>対象。push と強制削除は作業場の ID、確定と公開は記録の ID</td><td class="f">w-20261122-71b</td></tr>
+      <tr><td class="f">status</td><td>承認待ち / 承認済み / 実行済み</td><td>承認待ち</td></tr>
     </table></div>
-    <p class="cap">会話では「作業に承認ゲートの一覧を持たせる」としていましたが、入れ子を避けるために、独立したデータに分けています。</p>
+    <p class="cap">状態は、承認の記録から決まります。承認ゲートのファイルに書かれた <code>status</code> は写しで、判定には使いません。セッションが書き換えられる場所にあるからです。</p>
+    <div class="tbl"><table>
+      <tr><th>承認の記録の項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">gate_id</td><td>どの承認ゲートへの承認か</td><td class="f">g-20261122-b12</td></tr>
+      <tr><td class="f">action / target</td><td>承認した時点の操作と対象。承認ゲートと食い違えば、承認していないものとして扱う</td><td>push / <span class="mono">w-20261122-71b</span></td></tr>
+      <tr><td class="f">approved_at</td><td>承認した日時</td><td class="f">2026-11-22 14:00:00</td></tr>
+      <tr><td class="f">executed_at</td><td>hub が操作を実行した日時。空なら未実行</td><td>空</td></tr>
+    </table></div>
+    <p class="cap">承認の記録は <code>data/approvals/&lt;承認ゲートのID&gt;.json</code> に置きます。書くのは <code>hub gate approve</code> だけです。</p>
+  </div>
+
+  <div class="entity">
+    <h3>セッション <span class="mono">session</span></h3>
+    <div class="tbl"><table>
+      <tr><th>項目</th><th>意味</th><th>例</th></tr>
+      <tr><td class="f">id</td><td>セッションの ID</td><td class="f">s-20261122-748</td></tr>
+      <tr><td class="f">task_id</td><td>どの作業のセッションか</td><td class="f">t-20261122-a3f</td></tr>
+      <tr><td class="f">profile</td><td>起動したときのプロファイル</td><td class="f">default</td></tr>
+      <tr><td class="f">cwd</td><td>実行した場所。作業場か、作業のフォルダ</td><td class="f">~/dev/work/t-20261122-a3f/PoC</td></tr>
+      <tr><td class="f">started_at</td><td>開始した日時</td><td class="f">2026-11-22 13:54:44</td></tr>
+      <tr><td class="f">claude_session_id</td><td>Claude Code 側のセッションの ID。再開に使う。再開しても変わらない</td><td class="f">eb7356e8-…</td></tr>
+    </table></div>
+    <p class="cap">「実行中 / 終了」の状態は持ちません。動いているかどうかは、プロセスを見れば分かるからです。</p>
   </div>
 </section>
 
@@ -298,7 +325,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <div class="flow"><span class="who">作業</span><span class="chip">進行中</span><span class="arrow">→</span><span class="chip">終了</span><span class="arrow">→</span><span class="chip end">片付け済み</span></div>
     <div class="flow"><span class="who">記録</span><span class="chip">下書き</span><span class="arrow">→</span><span class="chip">確定</span><span class="arrow">→</span><span class="chip end">公開</span></div>
     <div class="flow"><span class="who">ToDo</span><span class="chip">未着手</span><span class="arrow">→</span><span class="chip end">作業化済み</span><span class="arrow">/</span><span class="chip end">完了</span><span class="arrow">/</span><span class="chip end">捨てた</span></div>
-    <div class="flow"><span class="who">承認ゲート</span><span class="chip">承認待ち</span><span class="arrow">→</span><span class="chip end">承認済み</span></div>
+    <div class="flow"><span class="who">承認ゲート</span><span class="chip">承認待ち</span><span class="arrow">→</span><span class="chip">承認済み</span><span class="arrow">→</span><span class="chip end">実行済み</span></div>
   </div>
   <div class="tbl"><table>
     <tr><th>記録の状態</th><th>置き場</th><th>失ったら</th></tr>
@@ -397,8 +424,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 </section>
 
 <section id="sessions">
-  <h2>セッションと認証 <span class="tag open">未実装</span></h2>
-  <p>ここは設計まで済んでいて、まだ作っていない部分です。人は Claude Desktop から作業を頼み、hub が WSL の中で Claude Code のセッションを起動します。</p>
+  <h2>セッションと認証</h2>
+  <p>人は Claude Desktop から作業を頼み、hub が WSL の中で Claude Code のセッションを起動します。プロファイル、セッションの起動と再開、承認の待ち行列、hub による push は <code>hub</code> コマンドに入っています。MCP と、外部のサービスの認証を hub が持つ部分は、まだ作っていません。</p>
 
   <h3>起動の流れ</h3>
   <div class="fig">
@@ -429,7 +456,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <p>プロファイルは、Claude Code の設定フォルダを丸ごと1つにまとめたものです。入っているスキル、プラグイン、MCP、権限の設定、そして Claude のアカウントの認証が、プロファイルごとに分かれます。プロファイルを1つ選ぶと、「何を使えるか」と「誰として動くか」が同時に決まります。</p>
   <ul>
     <li>プロファイルはデータとして保存しません。フォルダを見れば一覧が分かるので、必要なたびに読み取ります。</li>
-    <li>共通のスキルやエージェントは1か所に置き、各プロファイルからリンクします。</li>
+    <li>置き場は <code>~/dev/profiles/&lt;名前&gt;/</code> です。既定のプロファイルの名前は <code>default</code> です。Git の管理の外に置きます。</li>
+    <li>共通のスキルやエージェントは1か所に置き、各プロファイルからリンクします。(未実装)</li>
     <li>プライベートと社用は、必ずプロファイルを分けます。</li>
   </ul>
   <div class="tbl"><table>
@@ -472,10 +500,19 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h3>承認は待ち行列になる</h3>
   <p>対話なしのセッションは、途中で人に確認できません。そこで、やり直しがきかない操作は Claude ではなく hub が実行します。</p>
   <ol>
-    <li>Claude は、push などが必要になったら承認ゲートを登録して止まる。</li>
-    <li>人が画面で承認する。</li>
-    <li>hub が、承認を確かめてから操作を実行する。続きがあれば、セッションを再開する。</li>
+    <li>Claude は、push などが必要になったら承認ゲートを登録して止まる。(<code>hub push</code>、<code>hub record confirm</code> など)</li>
+    <li>人が承認する。(<code>hub gate approve</code>)</li>
+    <li>hub が承認の記録を書き、続けてその操作を実行する。成功したら「実行済み」になる。失敗したら「承認済み」のまま残り、もう一度承認のコマンドを実行すると再実行する。</li>
+    <li>続きがあれば、人か hub がセッションを再開する。</li>
   </ol>
+  <div class="tbl"><table>
+    <tr><th>操作</th><th>承認されたとき</th></tr>
+    <tr><td>push</td><td>hub が、登録されたリモートへ、その作業場のブランチを push する</td></tr>
+    <tr><td>記録の確定</td><td>hub が記録を「確定」にする</td></tr>
+    <tr><td>作業場の強制削除</td><td>hub が作業場を削除する</td></tr>
+    <tr><td>公開、リモートの作成・削除</td><td>hub は実行しない。承認済みであることを確かめてから、hub の外で行う</td></tr>
+  </table></div>
+  <p>承認の記録は、セッションから読めますが、書けません。書き込みは、サンドボックスと禁止の設定の両方で止めています。読み取りまで禁止すると、サンドボックスの中では空の場所に差し替わり、書き込みが通ったように見えてしまうので、読み取りは禁止しません。</p>
   <p>「Claude と人の分担」の表で人が承認するとしている操作は、この形になると、実行するのも hub になります。いま入れている「push のたびに確認する設定」は、役目を終えます。</p>
 
   <h3>禁止した操作を止める3層</h3>
@@ -492,9 +529,11 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td class="f">sandbox.failIfUnavailable</td><td>true</td><td>既定では、部品(bubblewrap と socat)が足りないとサンドボックス無しで動いてしまう</td></tr>
     <tr><td class="f">sandbox.allowUnsandboxedCommands</td><td>false</td><td>サンドボックスの外で実行し直す道をふさぐ</td></tr>
     <tr><td class="f">sandbox.filesystem.denyRead</td><td>認証情報の置き場</td><td>既定では、認証ファイルを Bash から読める</td></tr>
-    <tr><td class="f">sandbox.filesystem.denyWrite</td><td>承認の記録</td><td>Bash からの書き換えを止める。読むことはできる</td></tr>
-    <tr><td class="f">permissions.deny</td><td><code>Read(//絶対パス/**)</code> を上の2か所に</td><td>Read / Edit / Write の道具を止める。Read の禁止は書き込みも止める</td></tr>
+    <tr><td class="f">sandbox.filesystem.allowWrite</td><td>データリポジトリ、作業場の元のリポジトリの <code>.git</code></td><td>セッションの中から <code>hub</code> コマンドとコミットを使えるようにする</td></tr>
+    <tr><td class="f">sandbox.filesystem.denyWrite</td><td>承認の記録、hub リポジトリ、各 <code>.git</code> の <code>config</code> と <code>hooks</code></td><td>許可と禁止が重なったときは、禁止が勝つ。Git の設定とフックは、hub があとで Git を動かすときに実行されうるので止める</td></tr>
+    <tr><td class="f">permissions.deny</td><td><code>Edit(...)</code> を承認の記録と hub リポジトリに、<code>Read(...)</code> を認証情報に、<code>Bash(git push*)</code> と <code>Bash(hub gate approve*)</code></td><td>Read / Edit / Write の道具を止める。Read の禁止は書き込みも止める</td></tr>
   </table></div>
+  <p>この設定は、セッションを起動するたびに hub が組み立てて渡します。中身は <code>hub session settings</code> で見られます。hub 自身も、Git を動かすときはフックを無効にします。</p>
   <p>サンドボックスの既定では、実行した場所の中と <code>/tmp</code> には書けて、ホームの下のそれ以外には書けません。外部との通信は、許可した宛先だけが通ります。</p>
   <p>作業場の中での失敗(ファイルを消す、的外れなコミット)は止めません。作業場は使い捨てで Git の履歴もあるので、戻せることで守ります。</p>
 
@@ -515,8 +554,10 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td>作業に項目 <code>profile</code></td><td>どのプロファイルで動かす作業か</td></tr>
     <tr><td>リポジトリに項目 <code>profile</code></td><td>このリポジトリで使ってよいプロファイル。空ならどれでもよい</td></tr>
     <tr><td>7つ目のデータ「セッション」<code>session</code></td><td>ID、作業の ID、プロファイル、実行した場所、開始日時、Claude 側のセッション ID</td></tr>
+    <tr><td>承認ゲートの状態に「実行済み」</td><td>hub が操作を実行したあとの状態。同じ承認で2度実行されないようにする</td></tr>
+    <tr><td>承認の記録</td><td>承認ゲートの状態を決める原本。<code>data/approvals/</code> に置く</td></tr>
   </table></div>
-  <p>セッションに「実行中 / 終了」の状態は持たせません。動いているかどうかはプロセスを見れば分かるからです。項目を足すだけなので、スキーマのバージョンは変えません。</p>
+  <p>定義は「項目の定義」に入れてあります。項目と状態の値を足すだけで、既にある値の意味は変えていないので、スキーマのバージョンは変えていません。</p>
 
   <h3>試して確かめたこと</h3>
   <ul>
@@ -527,6 +568,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <li>再開すると、前の文脈を覚えたまま続く。セッションの ID は変わらない。別のフォルダからも再開できる。</li>
     <li>禁止した操作、確認が要る操作、許可していない操作は、どれもその操作だけが拒否される。セッションは止まらず、拒否された操作はコマンドの中身つきで結果に入る。</li>
     <li>サンドボックスは WSL2 で動く。Bash からの読み書きを場所ごとに止められる。Read / Write の道具は、禁止の設定で止められる。</li>
+    <li>プロファイルを <code>CLAUDE_CONFIG_DIR</code> で指定したセッションも、再開できる。</li>
+    <li>サンドボックスの中から <code>hub</code> コマンドでデータを書ける。承認の記録、hub リポジトリ、Git の設定とフックには書けない。</li>
   </ul>
   <p>試した内容と結果の詳細は、作業 <code>t-20261122-081</code> の記録「対話なしセッションの3点を試した結果」にあります。</p>
 </section>
@@ -545,10 +588,12 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   hub/                          <span class="c">仕組み(このリポジトリを clone したもの)</span>
   data/                         <span class="c">データリポジトリ(データ。ここだけ固定)</span>
     tasks/&lt;作業ID&gt;/              <span class="c">作業1件のデータと、その記録の HTML</span>
+    approvals/                  <span class="c">承認の記録(セッションからは書けない)</span>
     todos/                      <span class="c">ToDo(1件1ファイル)</span>
     repos/                      <span class="c">リポジトリの登録情報</span>
   repos/&lt;リポジトリ名&gt;/           <span class="c">コードの本体(ここでは直接作業しない)</span>
-  work/&lt;作業ID&gt;/&lt;リポジトリ名&gt;/   <span class="c">作業場</span></pre>
+  work/&lt;作業ID&gt;/&lt;リポジトリ名&gt;/   <span class="c">作業場</span>
+  profiles/&lt;名前&gt;/               <span class="c">プロファイル(Git の管理の外)</span></pre>
   <p>作業場は、リポジトリの下ではなく作業の下に置きます。人が追うときは、作業の IDを1つ知っていれば、<code>data/tasks/</code> で経緯が、<code>work/</code> でコードが見つかります。</p>
 </section>
 
@@ -586,9 +631,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h2>未確定と作る順番</h2>
   <h3>確かめていないこと <span class="tag open">未確認</span></h3>
   <ul>
-    <li>セッションの中から <code>hub</code> コマンドでデータを書く道。データリポジトリはホームの下にあるので、サンドボックスの既定では書けない。書けるようにしても、承認の記録は書けないままにする必要がある。</li>
-    <li><code>CLAUDE_CONFIG_DIR</code> を変えたプロファイルでの再開。</li>
-    <li>プロファイルに入れる許可の一覧。許可していない操作はすべて拒否される。</li>
+    <li>空のプロファイルを作り、ログインして使う流れ。試したのは、既にある設定フォルダをプロファイルにした場合だけ。</li>
+    <li>セッションが、他の作業のデータを書き換えないこと。いまは決まりで守っていて、仕組みでは止めていない。</li>
     <li>アーティファクトから、ローカル MCP の書き込みを呼べるか。</li>
     <li>Windows 側の Claude Desktop から、WSL の中の MCP に届くか。別の検証では、届きそうだと分かっている。</li>
   </ul>
@@ -603,7 +647,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <li>データリポジトリと、データを書き換える共通のコマンド群を作る。(済み)</li>
     <li>WSL でコマンドライン版の Claude Code にログインし直す。(済み)</li>
     <li>再開・禁止した操作・サンドボックスの3つを小さく試す。(済み)</li>
-    <li>プロファイル、セッションの起動、hub による push を作る。承認の仕組みを待ち行列の形に直す。</li>
+    <li>プロファイル、セッションの起動、hub による push を作る。承認の仕組みを待ち行列の形に直す。(済み。外部のサービスの認証を hub が持つ部分は未実装)</li>
     <li>MCP を作る。中身は <code>hub</code> コマンドを呼ぶだけにする。拡張を足す仕組みを入れる。</li>
     <li>全体作業・個別作業・ToDo の3つの画面のひな形を作る。</li>
   </ol>
