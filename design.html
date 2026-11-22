@@ -101,17 +101,34 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h1>開発基盤のデータ設計</h1>
   <p class="lead">Claude が並列で進める作業を、1か所のデータで統制するための設計です。主役は「作業」で、リポジトリやブランチはその持ち物として扱います。人はこのデータを画面越しに見るだけで、必要なときだけ中身を追いに行きます。</p>
   <nav class="toc" aria-label="目次">
+    <a href="#principles">考え方</a>
     <a href="#overview">全体像</a>
     <a href="#model">6つのデータ</a>
     <a href="#fields">欄の定義</a>
     <a href="#states">状態</a>
     <a href="#rules">ルール</a>
     <a href="#roles">Claude と人の分担</a>
+    <a href="#cycle">回し方</a>
     <a href="#layout">フォルダ配置</a>
-    <a href="#fixed">いま決めておくこと</a>
+    <a href="#fixed">固定するものと自由なもの</a>
     <a href="#open">未確定と作る順番</a>
   </nav>
 </header>
+
+<section id="principles">
+  <h2>考え方</h2>
+  <p>この仕組みが守ることは8つです。データ定義もルールも、ここから出ています。</p>
+  <div class="rules">
+    <div class="rule"><h3>主役は作業</h3><p>リポジトリもブランチも、作業の持ち物として扱います。全体の状況は、作業の一覧を見れば分かります。</p></div>
+    <div class="rule"><h3>データが原本、画面は表示</h3><p>画面は何度作り直しても構いません。使う人が自由に書き換えてよいものです。</p></div>
+    <div class="rule"><h3>書き換えの入口は1つ</h3><p>データを書き換えるのは <code>hub</code> コマンドだけです。Claude も MCP も、同じ入口を通ります。</p></div>
+    <div class="rule"><h3>作業は Claude、確認は人</h3><p>操作は Claude が行います。人が挟まるのは、やり直しがきかない操作だけです。</p></div>
+    <div class="rule"><h3>確かめられる値は保存しない</h3><p>Git に聞けば分かることは、聞くたびに確かめます。保存した値は、実際の状態とずれるからです。</p></div>
+    <div class="rule"><h3>登録の無いものはゴミ</h3><p>置き場を厳しく決める代わりに、すべてをデータに登録します。登録が無ければ消してよいものです。</p></div>
+    <div class="rule"><h3>欄は平らに保つ</h3><p>入れ子を作らず、複数あるものは別のデータにします。先回りした拡張は入れません。</p></div>
+    <div class="rule"><h3>仕組みとデータは別</h3><p>配るのは仕組みだけです。データは環境ごとに手元へ置き、混ぜません。</p></div>
+  </div>
+</section>
 
 <section id="overview">
   <h2>全体像</h2>
@@ -314,6 +331,32 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <p>書き手は3者います。裏で動く Claude Code、Claude Desktop 経由の MCP、そして直接ファイルを開くあなたです。データの形を崩さないために、書き換えは共通のコマンド群を通して行います。<span class="tag prop">提案</span></p>
 </section>
 
+<section id="cycle">
+  <h2>回し方</h2>
+  <p>1日はこの順に回ります。人が手を動かすのは、橙の2か所だけです。</p>
+  <div class="fig">
+    <svg viewBox="0 0 720 132" role="img" aria-label="人が朝に ToDo を仕分ける。Claude が作業を進める。人が承認待ちに答える。Claude が作業を閉じて片付ける。途中で出た引っかかりは ToDo に入り、翌朝の仕分けに回る。">
+      <g class="n-gate"><rect x="24" y="20" width="150" height="58" rx="8"/><text class="t1" x="99" y="44" text-anchor="middle">仕分ける</text><text class="t2" x="99" y="64" text-anchor="middle">人 / 朝に1回</text></g>
+      <g class="n-place"><rect x="204" y="20" width="150" height="58" rx="8"/><text class="t1" x="279" y="44" text-anchor="middle">作業を進める</text><text class="t2" x="279" y="64" text-anchor="middle">Claude / 並列で</text></g>
+      <g class="n-gate"><rect x="384" y="20" width="150" height="58" rx="8"/><text class="t1" x="459" y="44" text-anchor="middle">承認に答える</text><text class="t2" x="459" y="64" text-anchor="middle">人 / 待ちが出たとき</text></g>
+      <g class="n-place"><rect x="564" y="20" width="132" height="58" rx="8"/><text class="t1" x="630" y="44" text-anchor="middle">閉じて片付ける</text><text class="t2" x="630" y="64" text-anchor="middle">Claude</text></g>
+      <line class="ln" x1="174" y1="49" x2="200" y2="49" marker-end="url(#ah)"/>
+      <line class="ln" x1="354" y1="49" x2="380" y2="49" marker-end="url(#ah)"/>
+      <line class="ln" x1="534" y1="49" x2="560" y2="49" marker-end="url(#ah)"/>
+      <text class="lbl" x="360" y="112" text-anchor="middle">途中で出た引っかかりは ToDo に入り、翌朝の仕分けに回る</text>
+    </svg>
+  </div>
+  <div class="tbl"><table>
+    <tr><th>場面</th><th>きっかけ</th><th>やること</th></tr>
+    <tr><td>仕分ける</td><td>朝、または ToDo が溜まったとき</td><td>ToDo を1つずつ「作業にする / そのまま済ませる / 捨てる / 残す」に分ける</td></tr>
+    <tr><td>作業を起こす</td><td>仕分けで作業にしたとき、または人が頼んだとき</td><td>目的を書き、必要になる承認をゲートとして登録する</td></tr>
+    <tr><td>作業を進める</td><td>作業が進行中のあいだ</td><td>作業場を切る。記録を書く。大きくなったら子に分ける。引っかかりは ToDo に残す</td></tr>
+    <tr><td>承認に答える</td><td>承認待ちが出たとき</td><td>人がゲートを承認する。承認されるまで、その操作は止まる</td></tr>
+    <tr><td>閉じる</td><td>目的を果たした、吸収された、やめた、のどれか</td><td>子を先に整理する。その作業から出た ToDo を仕分ける</td></tr>
+    <tr><td>片付ける</td><td>作業を閉じたあと</td><td>作業場を1つずつ確かめて消す。下書きは確定に上げるか捨てる。全部済むと「片付け済み」になる</td></tr>
+  </table></div>
+</section>
+
 <section id="layout">
   <h2>フォルダ配置</h2>
   <p>仕組みとデータは別々に持ちます。GitHub に置いて配るのは仕組みだけで、データは環境ごとに手元へ置きます。同じ仕組みを、プライベートでも社用でも clone して使えます。</p>
@@ -336,8 +379,25 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 </section>
 
 <section id="fixed">
-  <h2>いま決めておくこと</h2>
-  <p>データ定義は、あとから変えにくい部分です。欄を平らに保つ方針はそのままにして、次の4点だけ作り始める前に固めます。</p>
+  <h2>固定するものと自由なもの</h2>
+  <p>この仕組みが約束するのは、データの形と回し方です。それ以外は、使う人が書き換えて構いません。</p>
+  <div class="tbl"><table>
+    <tr><th>固定する</th><th>自由にしてよい</th></tr>
+    <tr><td>6つのデータと、その欄・状態の値</td><td>画面(全体・個別作業・ToDo)の見た目と作り</td></tr>
+    <tr><td>ルール(親子、持ち主、閉じると片付ける、承認)</td><td>コードのリポジトリと作業場の置き場</td></tr>
+    <tr><td>書き換えの入口が <code>hub</code> コマンドだけであること</td><td>Claude 向けの決まりの言い回し</td></tr>
+    <tr><td>コマンドの名前と、<code>--json</code> で返す形</td><td>仕分けの頻度や、1日の進め方</td></tr>
+  </table></div>
+  <p>画面と MCP は、<code>hub</code> コマンドを呼ぶだけの薄い層にします。コマンドと返す形が変わらなければ、画面をどう書き換えても壊れません。</p>
+
+  <h3>欄を変えるときの決まり <span class="tag prop">提案</span></h3>
+  <ul>
+    <li>欄を足すだけなら、版の番号は変えません。古いファイルは、その欄が空のものとして読みます。</li>
+    <li>欄の意味を変える、欄を消す、状態の値を変えるときは、版の番号を上げ、古いファイルを直すコマンドを一緒に用意します。</li>
+  </ul>
+
+  <h3>作る前に固めた4点</h3>
+  <p>データ定義は、あとから変えにくい部分です。欄を平らに保つ方針はそのままにして、次の4点を先に決めました。</p>
   <div class="tbl"><table>
     <tr><th>項目</th><th>案</th><th>理由</th></tr>
     <tr><td>番号の付け方 <span class="tag prop">提案</span></td><td>種類の頭文字 + 日付 + 短い乱数(例 <code>t-20261122-a3f</code>)</td><td>連番にすると、並列で同時に起こしたときに同じ番号が付く</td></tr>
