@@ -65,14 +65,19 @@ const gitOk = (cwd, ...args) => { try { git(cwd, ...args); return true; } catch 
 function commit(files, msg) {
   if (!fs.existsSync(path.join(HUB, '.git'))) return;
   const rel = files.map((f) => path.relative(HUB, f));
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 20; i++) {
     try {
-      for (const r of rel) { try { git(HUB, 'add', '-A', '--', r); } catch { /* 未追跡のまま消えたファイル */ } }
+      for (const r of rel) {
+        try { git(HUB, 'add', '-A', '--', r); } catch (e) {
+          if (/index\.lock|Unable to create/.test(String(e.stderr || e.message))) throw e; // 並列でぶつかった。やり直す
+          /* それ以外は、未追跡のまま消えたファイル */
+        }
+      }
       const changed = rel.filter((r) => git(HUB, 'status', '--porcelain', '--', r) !== '');
       if (changed.length) git(HUB, 'commit', '-q', '-m', msg, '--', ...changed);
       return;
     } catch (e) {
-      if (!/index\.lock|Unable to create/.test(String(e.stderr || e.message)) || i === 5) {
+      if (!/index\.lock|Unable to create/.test(String(e.stderr || e.message)) || i === 19) {
         console.error(`警告: コミットできませんでした(データは保存済み): ${String(e.stderr || e.message).trim()}`);
         return;
       }

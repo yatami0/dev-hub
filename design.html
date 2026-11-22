@@ -547,6 +547,19 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td>例</td><td>作業を作る、ToDo を足す、承認する</td><td>Issue を取る、Redmine のチケットを取る、プロファイルの中身を見る</td></tr>
   </table></div>
   <p>道具の入口は2つあります。人は Claude Desktop から MCP 経由で呼び、WSL の中の Claude のセッションは <code>hub</code> コマンドとして呼びます。中のロジックは同じです。</p>
+  <ul>
+    <li>MCP の本体は <code>tool/mcp.mjs</code> です。コアの道具は、<code>hub</code> コマンドと1対1で対応します。名前は、コマンドの空白を <code>_</code> に替えたものです(<code>hub task new</code> は <code>task_new</code>)。</li>
+    <li>拡張は、環境ごとに <code>~/dev/extensions/*.mjs</code> へ置きます。MCP が起動のときに読み込み、名前の先頭に <code>ext_</code> を付けて並べます。</li>
+    <li>承認(<code>gate_approve</code>)も MCP から呼べます。人がはっきり承認したときだけ呼ぶ道具です。Claude Desktop 側で、この道具を「毎回確認する」にしておきます。</li>
+    <li>セッションの起動と再開は、終わるまで待ってから結果を返します。長い作業では、Claude Desktop 側の待ち時間を超える可能性があります。(未確認)</li>
+  </ul>
+<pre><span class="c">拡張の形(~/dev/extensions/sample.mjs)</span>
+export const tools = [{
+  name: 'hello',                          <span class="c">MCP では ext_hello になる</span>
+  description: '説明',
+  inputSchema: { type: 'object', properties: { who: { type: 'string' } } },
+  run: ({ who }) =&gt; ({ hello: who }),     <span class="c">文字列か、JSON にできる値を返す。書き込みはしない</span>
+}];</pre>
 
   <h3>データ定義への追加</h3>
   <div class="tbl"><table>
@@ -631,6 +644,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h2>未確定と作る順番</h2>
   <h3>確かめていないこと <span class="tag open">未確認</span></h3>
   <ul>
+    <li>MCP からセッションを起動したとき、長い作業が Claude Desktop 側の待ち時間に収まるか。</li>
     <li>空のプロファイルを作り、ログインして使う流れ。試したのは、既にある設定フォルダをプロファイルにした場合だけ。</li>
     <li>セッションが、他の作業のデータを書き換えないこと。いまは決まりで守っていて、仕組みでは止めていない。</li>
     <li>アーティファクトから、ローカル MCP の書き込みを呼べるか。</li>
@@ -648,7 +662,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <li>WSL でコマンドライン版の Claude Code にログインし直す。(済み)</li>
     <li>再開・禁止した操作・サンドボックスの3つを小さく試す。(済み)</li>
     <li>プロファイル、セッションの起動、hub による push を作る。承認の仕組みを待ち行列の形に直す。(済み。外部のサービスの認証を hub が持つ部分は未実装)</li>
-    <li>MCP を作る。中身は <code>hub</code> コマンドを呼ぶだけにする。拡張を足す仕組みを入れる。</li>
+    <li>MCP を作る。中身は <code>hub</code> コマンドを呼ぶだけにする。拡張を足す仕組みを入れる。(済み。Claude Desktop からつなぐ確認はまだ)</li>
     <li>全体作業・個別作業・ToDo の3つの画面のひな形を作る。</li>
   </ol>
 </section>

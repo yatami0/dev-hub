@@ -36,4 +36,14 @@ hub session start --task <作業ID> --prompt "..."
 既にある設定フォルダをそのままプロファイルにするときは `hub profile add default --path ~/.claude`。
 セッションに渡している設定は `hub session settings --task <作業ID>` で見られる。
 
+## MCP
+
+Claude Desktop からは MCP でつなぐ。Windows の Claude Desktop の設定(`claude_desktop_config.json`)に次を足す。`node` の場所は、WSL の中で `which node` を実行して確かめる。
+
+```json
+{ "mcpServers": { "hub": { "command": "wsl.exe", "args": ["--", "/usr/bin/node", "/home/<ユーザー名>/dev/hub/tool/mcp.mjs"] } } }
+```
+
+環境ごとの道具(拡張)は `~/dev/extensions/*.mjs` に置く。形は design.html の「コアと拡張」を参照。
+
 置き場を変えるときは、環境変数 `HUB_ROOT` に `~/dev` の代わりの場所を入れる。
