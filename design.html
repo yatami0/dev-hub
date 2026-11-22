@@ -110,6 +110,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <a href="#rules">ルール</a>
     <a href="#roles">Claude と人の分担</a>
     <a href="#cycle">回し方</a>
+    <a href="#sessions">セッションと認証</a>
     <a href="#layout">フォルダ配置</a>
     <a href="#fixed">固定するものと自由なもの</a>
     <a href="#open">未確定と作る順番</a>
@@ -137,7 +138,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="principles">
   <h2>考え方</h2>
-  <p>この仕組みが守ることは8つです。データ定義もルールも、ここから出ています。</p>
+  <p>この仕組みが守ることは10個です。データ定義もルールも、ここから出ています。</p>
   <div class="rules">
     <div class="rule"><h3>主役は作業</h3><p>リポジトリもブランチも、作業に所属するものとして扱います。全体の状況は、作業の一覧を見れば分かります。</p></div>
     <div class="rule"><h3>データが原本、画面は表示</h3><p>画面は何度作り直しても構いません。使う人が自由に書き換えてよいものです。</p></div>
@@ -147,6 +148,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <div class="rule"><h3>未登録のものは削除対象</h3><p>置き場を厳しく決める代わりに、すべてをデータに登録します。未登録のファイルやフォルダは、削除対象として扱います。</p></div>
     <div class="rule"><h3>項目は入れ子にしない</h3><p>入れ子を作らず、複数あるものは別のデータにします。先回りした拡張は入れません。</p></div>
     <div class="rule"><h3>仕組みとデータは別</h3><p>配るのは仕組みだけです。データは環境ごとにローカルへ置き、混ぜません。</p></div>
+    <div class="rule"><h3>鍵は渡さず、用事を代行する</h3><p>認証が要る操作は hub が実行し、Claude には結果だけを返します。認証情報そのものを渡す道具は作りません。</p></div>
+    <div class="rule"><h3>秘密はデータに入れない</h3><p>データリポジトリに入るのは、プロファイルの名前だけです。トークンや認証ファイルは Git の管理の外に置きます。</p></div>
   </div>
 </section>
 
@@ -393,6 +396,125 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   </table></div>
 </section>
 
+<section id="sessions">
+  <h2>セッションと認証 <span class="tag open">未実装</span></h2>
+  <p>ここは設計まで済んでいて、まだ作っていない部分です。人は Claude Desktop から作業を頼み、hub が WSL の中で Claude Code のセッションを起動します。</p>
+
+  <h3>起動の流れ</h3>
+  <div class="fig">
+    <svg viewBox="0 0 720 316" role="img" aria-label="Claude Desktop から hub の MCP を通じて hub コマンドが呼ばれる。hub コマンドは、プロファイルと作業場を指定して Claude Code のセッションを起動する。結果は記録、ToDo、承認待ちとして残る。">
+      <g class="n-rec"><rect x="40" y="30" width="180" height="56" rx="8"/><text class="t1" x="130" y="53" text-anchor="middle">Claude Desktop</text><text class="t2" x="130" y="72" text-anchor="middle">人が作業を頼む</text></g>
+      <g class="n-rec"><rect x="270" y="30" width="180" height="56" rx="8"/><text class="t1" x="360" y="53" text-anchor="middle">hub の MCP</text><text class="t2" x="360" y="72" text-anchor="middle">1つだけ</text></g>
+      <g class="n-task"><rect x="500" y="30" width="180" height="56" rx="8"/><text class="t1" x="590" y="53" text-anchor="middle">hub コマンド</text><text class="t2" x="590" y="72" text-anchor="middle">起動して記録する</text></g>
+      <line class="ln" x1="220" y1="58" x2="266" y2="58" marker-end="url(#ah)"/>
+      <line class="ln" x1="450" y1="58" x2="496" y2="58" marker-end="url(#ah)"/>
+      <path class="ln" d="M590 86 L590 118 L360 118 L360 146" marker-end="url(#ah)"/>
+      <g class="n-place"><rect x="40" y="150" width="180" height="56" rx="8"/><text class="t1" x="130" y="173" text-anchor="middle">プロファイル</text><text class="t2" x="130" y="192" text-anchor="middle">何を使えるか、誰として動くか</text></g>
+      <g class="n-task"><rect x="270" y="150" width="180" height="56" rx="8"/><text class="t1" x="360" y="173" text-anchor="middle">セッション</text><text class="t2" x="360" y="192" text-anchor="middle">Claude Code が動く</text></g>
+      <g class="n-place"><rect x="500" y="150" width="180" height="56" rx="8"/><text class="t1" x="590" y="173" text-anchor="middle">作業場</text><text class="t2" x="590" y="192" text-anchor="middle">どこで作業するか</text></g>
+      <line class="ln" x1="220" y1="178" x2="266" y2="178" marker-end="url(#ah)"/>
+      <line class="ln" x1="500" y1="178" x2="454" y2="178" marker-end="url(#ah)"/>
+      <line class="ln" x1="360" y1="206" x2="360" y2="236" marker-end="url(#ah)"/>
+      <g class="n-rec"><rect x="270" y="240" width="180" height="56" rx="8"/><text class="t1" x="360" y="263" text-anchor="middle">結果</text><text class="t2" x="360" y="282" text-anchor="middle">記録・ToDo・承認待ち</text></g>
+    </svg>
+  </div>
+  <ul>
+    <li>セッションは対話なしで起動します。指示を1つ渡して実行し、結果とセッションの ID を受け取ります。続きは同じセッションを再開して渡します。</li>
+    <li>起動のとき、環境変数 <code>CLAUDE_CONFIG_DIR</code> でプロファイルを指定します。</li>
+    <li>途中で口を挟みたい作業のために、あとから Remote Control でつなぐ方式を足せます。</li>
+  </ul>
+
+  <h3>プロファイル</h3>
+  <p>プロファイルは、Claude Code の設定フォルダを丸ごと1つにまとめたものです。入っているスキル、プラグイン、MCP、権限の設定、そして Claude のアカウントの認証が、プロファイルごとに分かれます。プロファイルを1つ選ぶと、「何を使えるか」と「誰として動くか」が同時に決まります。</p>
+  <ul>
+    <li>プロファイルはデータとして保存しません。フォルダを見れば一覧が分かるので、必要なたびに読み取ります。</li>
+    <li>共通のスキルやエージェントは1か所に置き、各プロファイルからリンクします。</li>
+    <li>プライベートと社用は、必ずプロファイルを分けます。</li>
+  </ul>
+  <div class="tbl"><table>
+    <tr><th>選ぶ段</th><th>内容</th></tr>
+    <tr><td>既定のプロファイル</td><td>何も指定しなければ、これで起動する</td></tr>
+    <tr><td>リポジトリの指定</td><td>「このリポジトリはこのプロファイルで」と決めておける。食い違う作業は、作業場を作る時点で止まる</td></tr>
+    <tr><td>作業での指定</td><td>作業を作るときに選ぶ。既定より優先する</td></tr>
+  </table></div>
+
+  <h3>認証の持ち方</h3>
+  <p>認証情報は hub が持ち、Claude のセッションには渡しません。Claude は hub に用事を頼み、結果だけを受け取ります。</p>
+  <div class="fig">
+    <svg viewBox="0 0 720 220" role="img" aria-label="Claude のセッションは hub に用事を頼む。hub は自分だけが読める認証情報を使って外部のサービスを操作し、結果だけを Claude に返す。">
+      <g class="n-place"><rect x="40" y="34" width="180" height="56" rx="8"/><text class="t1" x="130" y="57" text-anchor="middle">Claude のセッション</text><text class="t2" x="130" y="76" text-anchor="middle">鍵は持たない</text></g>
+      <g class="n-task"><rect x="270" y="34" width="180" height="56" rx="8"/><text class="t1" x="360" y="57" text-anchor="middle">hub</text><text class="t2" x="360" y="76" text-anchor="middle">用事を代わりに実行する</text></g>
+      <g class="n-rec"><rect x="500" y="34" width="180" height="56" rx="8"/><text class="t1" x="590" y="57" text-anchor="middle">外部のサービス</text><text class="t2" x="590" y="76" text-anchor="middle">GitHub、Redmine など</text></g>
+      <line class="ln" x1="220" y1="52" x2="266" y2="52" marker-end="url(#ah)"/>
+      <line class="ln" x1="270" y1="74" x2="224" y2="74" marker-end="url(#ah)"/>
+      <line class="ln" x1="450" y1="62" x2="496" y2="62" marker-end="url(#ah)"/>
+      <line class="ln" x1="360" y1="140" x2="360" y2="94" marker-end="url(#ah)"/>
+      <g class="n-gate"><rect x="270" y="144" width="180" height="56" rx="8"/><text class="t1" x="360" y="167" text-anchor="middle">認証情報</text><text class="t2" x="360" y="186" text-anchor="middle">hub だけが読める</text></g>
+      <text class="lbl" x="130" y="120" text-anchor="middle">頼む → 結果だけ返る</text>
+    </svg>
+  </div>
+  <div class="tbl"><table>
+    <tr><th>操作</th><th>誰がやるか</th><th>Claude に認証が要るか</th></tr>
+    <tr><td>リポジトリを clone する、最新を取り込む</td><td>hub</td><td>要らない</td></tr>
+    <tr><td>作業場を作る</td><td>hub</td><td>要らない</td></tr>
+    <tr><td>編集し、コミットする</td><td>Claude</td><td>要らない(通信を使わない)</td></tr>
+    <tr><td>push する、PR を作る</td><td>hub(人が承認したあと)</td><td>要らない</td></tr>
+    <tr><td>Issue やチケットを読む</td><td>hub の拡張</td><td>要らない</td></tr>
+    <tr><td>Claude Code を動かす</td><td>Claude</td><td>要る。プロファイルで渡す</td></tr>
+  </table></div>
+  <ul>
+    <li>外部のサービスの認証は、プロファイルの名前ごとに hub が持ちます。作業のプロファイルに合うものを使います。</li>
+    <li>どうしても Claude 自身に通信させたいときは、対象と権限を絞った読み取り専用の鍵だけを渡します。</li>
+    <li>プロファイルに入れた MCP は Claude がそのまま使えるので、作業に必要なものだけを入れます。</li>
+  </ul>
+
+  <h3>承認は待ち行列になる</h3>
+  <p>対話なしのセッションは、途中で人に確認できません。そこで、やり直しがきかない操作は Claude ではなく hub が実行します。</p>
+  <ol>
+    <li>Claude は、push などが必要になったら承認ゲートを登録して止まる。</li>
+    <li>人が画面で承認する。</li>
+    <li>hub が、承認を確かめてから操作を実行する。続きがあれば、セッションを再開する。</li>
+  </ol>
+  <p>「Claude と人の分担」の表で人が承認するとしている操作は、この形になると、実行するのも hub になります。いま入れている「push のたびに確認する設定」は、役目を終えます。</p>
+
+  <h3>禁止した操作を止める3層</h3>
+  <div class="tbl"><table>
+    <tr><th>層</th><th>仕組み</th><th>強さ</th></tr>
+    <tr><td>認証を渡さない</td><td>書き込める認証を Claude のセッションに渡さない</td><td>一番強い。認証が無ければ、コマンドをどう書いても失敗する</td></tr>
+    <tr><td>禁止の設定</td><td>プロファイルの設定で、特定のコマンドや道具を禁止する</td><td>中くらい。書き方を変えると一致しない場合がある</td></tr>
+    <tr><td>サンドボックス</td><td>Claude のセッションが、認証情報の置き場と承認の記録に触れないようにする</td><td>上の2つを成り立たせる条件。設定の中身は未確認</td></tr>
+  </table></div>
+  <p>作業場の中での失敗(ファイルを消す、的外れなコミット)は止めません。作業場は使い捨てで Git の履歴もあるので、戻せることで守ります。</p>
+
+  <h3>コアと拡張</h3>
+  <p>hub の MCP は1つだけです。リポジトリや外部のサービスが増えても、MCP は増えません。中の道具は2層に分かれます。</p>
+  <div class="tbl"><table>
+    <tr><th></th><th>コア</th><th>拡張</th></tr>
+    <tr><td>扱うもの</td><td>この資料のデータ</td><td>hub が持っていない情報。外部のサービス、環境の状態</td></tr>
+    <tr><td>書き込み</td><td>する</td><td>しない。書き込みたいときは、コアの操作か承認ゲートを通す</td></tr>
+    <tr><td>置き場</td><td>hub リポジトリ</td><td>環境ごと。hub リポジトリが配るのは、拡張を足す仕組みだけ</td></tr>
+    <tr><td>例</td><td>作業を作る、ToDo を足す、承認する</td><td>Issue を取る、Redmine のチケットを取る、プロファイルの中身を見る</td></tr>
+  </table></div>
+  <p>道具の入口は2つあります。人は Claude Desktop から MCP 経由で呼び、WSL の中の Claude のセッションは <code>hub</code> コマンドとして呼びます。中のロジックは同じです。</p>
+
+  <h3>データ定義への追加</h3>
+  <div class="tbl"><table>
+    <tr><th>追加</th><th>内容</th></tr>
+    <tr><td>作業に項目 <code>profile</code></td><td>どのプロファイルで動かす作業か</td></tr>
+    <tr><td>リポジトリに項目 <code>profile</code></td><td>このリポジトリで使ってよいプロファイル。空ならどれでもよい</td></tr>
+    <tr><td>7つ目のデータ「セッション」<code>session</code></td><td>ID、作業の ID、プロファイル、実行した場所、開始日時、Claude 側のセッション ID</td></tr>
+  </table></div>
+  <p>セッションに「実行中 / 終了」の状態は持たせません。動いているかどうかはプロセスを見れば分かるからです。項目を足すだけなので、スキーマのバージョンは変えません。</p>
+
+  <h3>試して確かめたこと</h3>
+  <ul>
+    <li>対話なしで実行すると、結果、セッションの ID、エラーの有無、拒否された操作の一覧が、データとして返る。</li>
+    <li>空のプロファイルを指定すると「ログインしていません」になる。認証はプロファイルごとに分かれている。</li>
+    <li>指定したフォルダに、設定、セッションの履歴、認証情報が作られる。履歴は実行した場所ごとに分かれる。</li>
+    <li>無人の実行には、<code>claude setup-token</code> で作ったトークンを <code>CLAUDE_CODE_OAUTH_TOKEN</code> で渡す方法が案内されている。</li>
+  </ul>
+</section>
+
 <section id="layout">
   <h2>フォルダ配置</h2>
   <p>仕組みとデータは別々に持ちます。GitHub に置いて配るのは仕組みだけで、データは環境ごとにローカルへ置きます。同じ仕組みを、プライベートでも社用でも clone して使えます。</p>
@@ -423,6 +545,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <tr><td>ルール(親子、所属、終了と片付け、承認)</td><td>コードのリポジトリと作業場の置き場</td></tr>
     <tr><td>書き換えが <code>hub</code> コマンド経由だけであること</td><td>Claude 向けのルールの言い回し</td></tr>
     <tr><td>コマンドの名前と、<code>--json</code> で返す形</td><td>仕分けの頻度や、1日の進め方</td></tr>
+    <tr><td>コアの道具(6つのデータを読み書きするもの)</td><td>拡張の道具(外部のサービスや環境の状態を読むもの。環境ごとに足す)</td></tr>
   </table></div>
   <p>画面と MCP は、<code>hub</code> コマンドを呼ぶだけの薄い層にします。コマンドと返す形が変わらなければ、画面をどう書き換えても壊れません。</p>
 
@@ -447,10 +570,11 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h2>未確定と作る順番</h2>
   <h3>確かめていないこと <span class="tag open">未確認</span></h3>
   <ul>
+    <li>セッションを再開して、続きの指示を渡したときの動き。</li>
+    <li>対話なしのセッションが、禁止した操作や確認が要る操作に当たったときの動き。</li>
+    <li>サンドボックスで、認証情報の置き場と承認の記録を読み書きできなくできるか。WSL で動くか。</li>
     <li>アーティファクトから、ローカル MCP の書き込みを呼べるか。</li>
-    <li>Windows 側の Claude Desktop から、WSL の中の MCP に届くか。</li>
-    <li>アーティファクトから Claude のセッションを作れるか。別の道として、MCP から WSL 側の Claude Code を起動する形があります。</li>
-    <li>承認を強制する設定の正確な書き方。</li>
+    <li>Windows 側の Claude Desktop から、WSL の中の MCP に届くか。別の検証では、届きそうだと分かっている。</li>
   </ul>
   <h3>後回しにしたこと</h3>
   <ul>
@@ -461,10 +585,11 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h3>作る順番</h3>
   <ol>
     <li>データリポジトリと、データを書き換える共通のコマンド群を作る。(済み)</li>
-    <li>アーティファクトとローカル MCP がつながるかを小さく試す。</li>
-    <li>MCP を作る。中身は 1 のコマンド群を呼ぶだけにする。</li>
-    <li>全体作業・個別作業・ToDo の3つの画面を作る。</li>
-    <li>アーティファクトからのセッション起動。</li>
+    <li>WSL でコマンドライン版の Claude Code にログインし直す。(人がやる)</li>
+    <li>上の未確認のうち、再開・禁止した操作・サンドボックスの3つを小さく試す。</li>
+    <li>プロファイル、セッションの起動、hub による push を作る。承認の仕組みを待ち行列の形に直す。</li>
+    <li>MCP を作る。中身は <code>hub</code> コマンドを呼ぶだけにする。拡張を足す仕組みを入れる。</li>
+    <li>全体作業・個別作業・ToDo の3つの画面のひな形を作る。</li>
   </ol>
 </section>
 
