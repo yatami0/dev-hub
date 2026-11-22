@@ -57,8 +57,10 @@ for (const [cmd, description, pos, opts, flags, json] of CORE) {
     if (o.endsWith('*')) required.push(prop(k));
   }
   for (const f of flags) properties[prop(f)] = { type: 'boolean' };
+  // 読むだけの道具には、その旨を付ける。画面が確認なしで読めて、結果を使い回せるようになる。
+  const readOnly = json && !cmd.startsWith('session st') && cmd !== 'session resume';
   tools.set(cmd.replace(' ', '_'), {
-    description, inputSchema: { type: 'object', properties, required },
+    description, inputSchema: { type: 'object', properties, required }, annotations: { readOnlyHint: readOnly },
     run: (a) => {
       const argv = [...cmd.split(' ')];
       if (pos) argv.push(String(a[pos]));
@@ -100,7 +102,7 @@ async function handle(req) {
   if (id === undefined) return; // 通知には答えない
   if (method === 'initialize') return send({ id, result: { protocolVersion: params?.protocolVersion || '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'hub', version: '1' } } });
   if (method === 'ping') return send({ id, result: {} });
-  if (method === 'tools/list') return send({ id, result: { tools: [...tools].map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema })) } });
+  if (method === 'tools/list') return send({ id, result: { tools: [...tools].map(([name, t]) => ({ name, description: t.description, inputSchema: t.inputSchema, ...(t.annotations ? { annotations: t.annotations } : {}) })) } });
   if (method === 'tools/call') {
     const t = tools.get(params?.name);
     if (!t) return send({ id, error: { code: -32602, message: `道具 ${params?.name} はありません` } });
