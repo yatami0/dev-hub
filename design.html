@@ -295,7 +295,7 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <div class="rule"><h3>自分の作業しか書かない</h3><p>各セッションは、自分が担当する作業の配下だけを書き換え、自分が触ったファイルだけをコミットします。</p></div>
     <div class="rule"><h3>共有の一覧は保存しない</h3><p>作業の一覧や ToDo の一覧は、ファイルとして持ちません。表示のたびに1件ずつのファイルから組み立てます。</p></div>
     <div class="rule"><h3>登録の無いものはゴミ</h3><p>作業場も記録も、必ずデータに登録します。登録されていないフォルダは、消してよいものとして機械的に見つけられます。</p></div>
-    <div class="rule"><h3>ToDo は1日1回仕分ける</h3><p>作業にする、そのまま済ませる、捨てる、残す、のどれかを選びます。作業を閉じるときも、そこから出た ToDo を仕分けます。</p></div>
+    <div class="rule"><h3>ToDo は作業の手前の受け皿</h3><p>ToDo は作業ではありません。作業にすると決めたときに、初めて作業が1件起きます。作業は ToDo を経由しなくても起こせます。</p></div>
   </div>
 
   <h3>親子の例</h3>
@@ -333,27 +333,43 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
 
 <section id="cycle">
   <h2>回し方</h2>
-  <p>1日はこの順に回ります。人が手を動かすのは、橙の2か所だけです。</p>
+  <p>流れは2つあり、別々に回ります。中心は作業の流れで、いつでも起こせて、いくつでも並列に進みます。ToDo の流れは、その手前にある受け皿です。2つがつながるのは、作業の途中で ToDo が出るときと、ToDo を作業にするときの2か所だけです。</p>
   <div class="fig">
-    <svg viewBox="0 0 720 132" role="img" aria-label="人が朝に ToDo を仕分ける。Claude が作業を進める。人が承認待ちに答える。Claude が作業を閉じて片付ける。途中で出た引っかかりは ToDo に入り、翌朝の仕分けに回る。">
-      <g class="n-gate"><rect x="24" y="20" width="150" height="58" rx="8"/><text class="t1" x="99" y="44" text-anchor="middle">仕分ける</text><text class="t2" x="99" y="64" text-anchor="middle">人 / 朝に1回</text></g>
-      <g class="n-place"><rect x="204" y="20" width="150" height="58" rx="8"/><text class="t1" x="279" y="44" text-anchor="middle">作業を進める</text><text class="t2" x="279" y="64" text-anchor="middle">Claude / 並列で</text></g>
-      <g class="n-gate"><rect x="384" y="20" width="150" height="58" rx="8"/><text class="t1" x="459" y="44" text-anchor="middle">承認に答える</text><text class="t2" x="459" y="64" text-anchor="middle">人 / 待ちが出たとき</text></g>
-      <g class="n-place"><rect x="564" y="20" width="132" height="58" rx="8"/><text class="t1" x="630" y="44" text-anchor="middle">閉じて片付ける</text><text class="t2" x="630" y="64" text-anchor="middle">Claude</text></g>
-      <line class="ln" x1="174" y1="49" x2="200" y2="49" marker-end="url(#ah)"/>
-      <line class="ln" x1="354" y1="49" x2="380" y2="49" marker-end="url(#ah)"/>
-      <line class="ln" x1="534" y1="49" x2="560" y2="49" marker-end="url(#ah)"/>
-      <text class="lbl" x="360" y="112" text-anchor="middle">途中で出た引っかかりは ToDo に入り、翌朝の仕分けに回る</text>
+    <svg viewBox="0 0 720 250" role="img" aria-label="作業の流れは、起こす、進める、承認に答える、閉じる、片付けるの順に進む。ToDo の流れは、残す、仕分けるの順に進む。作業を進める途中で引っかかりが ToDo に残り、仕分けで作業にすると決めたものが作業として起こされる。">
+      <text class="lbl" x="24" y="18">作業の流れ / いつでも起こせる。いくつでも並列に進む</text>
+      <g class="n-task"><rect x="24" y="34" width="120" height="54" rx="8"/><text class="t1" x="84" y="57" text-anchor="middle">起こす</text><text class="t2" x="84" y="76" text-anchor="middle">人 か Claude</text></g>
+      <g class="n-place"><rect x="174" y="34" width="120" height="54" rx="8"/><text class="t1" x="234" y="57" text-anchor="middle">進める</text><text class="t2" x="234" y="76" text-anchor="middle">Claude</text></g>
+      <g class="n-gate"><rect x="324" y="34" width="140" height="54" rx="8"/><text class="t1" x="394" y="57" text-anchor="middle">承認に答える</text><text class="t2" x="394" y="76" text-anchor="middle">人 / 必要なときだけ</text></g>
+      <g class="n-place"><rect x="494" y="34" width="90" height="54" rx="8"/><text class="t1" x="539" y="57" text-anchor="middle">閉じる</text><text class="t2" x="539" y="76" text-anchor="middle">Claude</text></g>
+      <g class="n-place"><rect x="614" y="34" width="90" height="54" rx="8"/><text class="t1" x="659" y="57" text-anchor="middle">片付ける</text><text class="t2" x="659" y="76" text-anchor="middle">Claude</text></g>
+      <line class="ln" x1="144" y1="61" x2="170" y2="61" marker-end="url(#ah)"/>
+      <line class="ln" x1="294" y1="61" x2="320" y2="61" marker-end="url(#ah)"/>
+      <line class="ln" x1="464" y1="61" x2="490" y2="61" marker-end="url(#ah)"/>
+      <line class="ln" x1="584" y1="61" x2="610" y2="61" marker-end="url(#ah)"/>
+      <line class="ln" x1="234" y1="88" x2="234" y2="158" marker-end="url(#ah)"/>
+      <text class="lbl" x="244" y="128">引っかかり</text>
+      <line class="ln" x1="84" y1="162" x2="84" y2="92" marker-end="url(#ah)"/>
+      <text class="lbl" x="94" y="128">作業にする</text>
+      <g class="n-gate"><rect x="24" y="162" width="120" height="54" rx="8"/><text class="t1" x="84" y="185" text-anchor="middle">仕分ける</text><text class="t2" x="84" y="204" text-anchor="middle">人 / 好きなときに</text></g>
+      <g class="n-rec"><rect x="174" y="162" width="120" height="54" rx="8"/><text class="t1" x="234" y="185" text-anchor="middle">残す</text><text class="t2" x="234" y="204" text-anchor="middle">人 か Claude</text></g>
+      <line class="ln" x1="174" y1="189" x2="148" y2="189" marker-end="url(#ah)"/>
+      <text class="lbl" x="324" y="184">ToDo の流れ / 思いついたとき、何度でも</text>
+      <text class="lbl" x="324" y="204">作業にしないものは、そのまま済ませるか捨てる</text>
     </svg>
   </div>
+  <p>作業は ToDo を経由しなくても起こせます。「これをやって」と頼めば、その場で作業が1件起きます。ToDo は、いますぐ作業にするほどではないものを取っておく場所です。</p>
   <div class="tbl"><table>
     <tr><th>場面</th><th>きっかけ</th><th>やること</th></tr>
-    <tr><td>仕分ける</td><td>朝、または ToDo が溜まったとき</td><td>ToDo を1つずつ「作業にする / そのまま済ませる / 捨てる / 残す」に分ける</td></tr>
-    <tr><td>作業を起こす</td><td>仕分けで作業にしたとき、または人が頼んだとき</td><td>目的を書き、必要になる承認をゲートとして登録する</td></tr>
+    <tr><td>作業を起こす</td><td>人が頼んだとき。または ToDo を作業にすると決めたとき</td><td>目的を書き、必要になる承認をゲートとして登録する</td></tr>
     <tr><td>作業を進める</td><td>作業が進行中のあいだ</td><td>作業場を切る。記録を書く。大きくなったら子に分ける。引っかかりは ToDo に残す</td></tr>
     <tr><td>承認に答える</td><td>承認待ちが出たとき</td><td>人がゲートを承認する。承認されるまで、その操作は止まる</td></tr>
     <tr><td>閉じる</td><td>目的を果たした、吸収された、やめた、のどれか</td><td>子を先に整理する。その作業から出た ToDo を仕分ける</td></tr>
     <tr><td>片付ける</td><td>作業を閉じたあと</td><td>作業場を1つずつ確かめて消す。下書きは確定に上げるか捨てる。全部済むと「片付け済み」になる</td></tr>
+  </table></div>
+  <div class="tbl"><table>
+    <tr><th>ToDo の場面</th><th>きっかけ</th><th>やること</th></tr>
+    <tr><td>残す</td><td>作業の途中で引っかかったとき。ふと思いついたとき</td><td>一言で書く。やる日が決まっていれば日付を入れる</td></tr>
+    <tr><td>仕分ける</td><td>好きなとき。回数も頻度も決めない</td><td>1つずつ「作業にする / そのまま済ませる / 捨てる / 残す」に分ける</td></tr>
   </table></div>
 </section>
 
