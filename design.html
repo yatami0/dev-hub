@@ -419,7 +419,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     </svg>
   </div>
   <ul>
-    <li>セッションは対話なしで起動します。指示を1つ渡して実行し、結果とセッションの ID を受け取ります。続きは同じセッションを再開して渡します。</li>
+    <li>セッションは対話なしで起動します。指示を1つ渡して実行し、結果とセッションの ID を受け取ります。続きは同じセッションを再開して渡します。再開してもセッションの ID は変わりません。</li>
+    <li>hub は実行のたびに、結果に入っている「拒否された操作の一覧」を読みます。拒否があってもセッションはエラーにならず最後まで進むので、エラーの有無だけでは気づけません。</li>
     <li>起動のとき、環境変数 <code>CLAUDE_CONFIG_DIR</code> でプロファイルを指定します。</li>
     <li>途中で口を挟みたい作業のために、あとから Remote Control でつなぐ方式を足せます。</li>
   </ul>
@@ -481,9 +482,20 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <div class="tbl"><table>
     <tr><th>層</th><th>仕組み</th><th>強さ</th></tr>
     <tr><td>認証を渡さない</td><td>書き込める認証を Claude のセッションに渡さない</td><td>一番強い。認証が無ければ、コマンドをどう書いても失敗する</td></tr>
-    <tr><td>禁止の設定</td><td>プロファイルの設定で、特定のコマンドや道具を禁止する</td><td>中くらい。書き方を変えると一致しない場合がある</td></tr>
-    <tr><td>サンドボックス</td><td>Claude のセッションが、認証情報の置き場と承認の記録に触れないようにする</td><td>上の2つを成り立たせる条件。設定の中身は未確認</td></tr>
+    <tr><td>禁止の設定</td><td>プロファイルの設定で、特定のコマンドや道具を禁止する。Read / Edit / Write の道具から、認証情報の置き場と承認の記録を守るのもこの層</td><td>中くらい。書き方を変えると一致しない場合がある</td></tr>
+    <tr><td>サンドボックス</td><td>Bash から、認証情報の置き場と承認の記録に触れないようにする。外部との通信も止める</td><td>上の2つを成り立たせる条件。WSL2 で動くことを確認済み。効くのは Bash だけ</td></tr>
   </table></div>
+  <p>サンドボックスと禁止の設定は、必ず両方を入れます。サンドボックスは Bash にしか効かず、禁止の設定は Bash の中で動くコマンドには効かないからです。プロファイルに入れる設定は次のとおりです。</p>
+  <div class="tbl"><table>
+    <tr><th>設定</th><th>値</th><th>理由</th></tr>
+    <tr><td class="f">sandbox.enabled</td><td>true</td><td>Bash をサンドボックスの中で動かす</td></tr>
+    <tr><td class="f">sandbox.failIfUnavailable</td><td>true</td><td>既定では、部品(bubblewrap と socat)が足りないとサンドボックス無しで動いてしまう</td></tr>
+    <tr><td class="f">sandbox.allowUnsandboxedCommands</td><td>false</td><td>サンドボックスの外で実行し直す道をふさぐ</td></tr>
+    <tr><td class="f">sandbox.filesystem.denyRead</td><td>認証情報の置き場</td><td>既定では、認証ファイルを Bash から読める</td></tr>
+    <tr><td class="f">sandbox.filesystem.denyWrite</td><td>承認の記録</td><td>Bash からの書き換えを止める。読むことはできる</td></tr>
+    <tr><td class="f">permissions.deny</td><td><code>Read(//絶対パス/**)</code> を上の2か所に</td><td>Read / Edit / Write の道具を止める。Read の禁止は書き込みも止める</td></tr>
+  </table></div>
+  <p>サンドボックスの既定では、実行した場所の中と <code>/tmp</code> には書けて、ホームの下のそれ以外には書けません。外部との通信は、許可した宛先だけが通ります。</p>
   <p>作業場の中での失敗(ファイルを消す、的外れなコミット)は止めません。作業場は使い捨てで Git の履歴もあるので、戻せることで守ります。</p>
 
   <h3>コアと拡張</h3>
@@ -512,7 +524,11 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
     <li>空のプロファイルを指定すると「ログインしていません」になる。認証はプロファイルごとに分かれている。</li>
     <li>指定したフォルダに、設定、セッションの履歴、認証情報が作られる。履歴は実行した場所ごとに分かれる。</li>
     <li>無人の実行には、<code>claude setup-token</code> で作ったトークンを <code>CLAUDE_CODE_OAUTH_TOKEN</code> で渡す方法が案内されている。</li>
+    <li>再開すると、前の文脈を覚えたまま続く。セッションの ID は変わらない。別のフォルダからも再開できる。</li>
+    <li>禁止した操作、確認が要る操作、許可していない操作は、どれもその操作だけが拒否される。セッションは止まらず、拒否された操作はコマンドの中身つきで結果に入る。</li>
+    <li>サンドボックスは WSL2 で動く。Bash からの読み書きを場所ごとに止められる。Read / Write の道具は、禁止の設定で止められる。</li>
   </ul>
+  <p>試した内容と結果の詳細は、作業 <code>t-20261122-081</code> の記録「対話なしセッションの3点を試した結果」にあります。</p>
 </section>
 
 <section id="layout">
@@ -570,9 +586,9 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h2>未確定と作る順番</h2>
   <h3>確かめていないこと <span class="tag open">未確認</span></h3>
   <ul>
-    <li>セッションを再開して、続きの指示を渡したときの動き。</li>
-    <li>対話なしのセッションが、禁止した操作や確認が要る操作に当たったときの動き。</li>
-    <li>サンドボックスで、認証情報の置き場と承認の記録を読み書きできなくできるか。WSL で動くか。</li>
+    <li>セッションの中から <code>hub</code> コマンドでデータを書く道。データリポジトリはホームの下にあるので、サンドボックスの既定では書けない。書けるようにしても、承認の記録は書けないままにする必要がある。</li>
+    <li><code>CLAUDE_CONFIG_DIR</code> を変えたプロファイルでの再開。</li>
+    <li>プロファイルに入れる許可の一覧。許可していない操作はすべて拒否される。</li>
     <li>アーティファクトから、ローカル MCP の書き込みを呼べるか。</li>
     <li>Windows 側の Claude Desktop から、WSL の中の MCP に届くか。別の検証では、届きそうだと分かっている。</li>
   </ul>
@@ -585,8 +601,8 @@ footer{font-size:13.5px;color:var(--muted);border-top:1px solid var(--line);padd
   <h3>作る順番</h3>
   <ol>
     <li>データリポジトリと、データを書き換える共通のコマンド群を作る。(済み)</li>
-    <li>WSL でコマンドライン版の Claude Code にログインし直す。(人がやる)</li>
-    <li>上の未確認のうち、再開・禁止した操作・サンドボックスの3つを小さく試す。</li>
+    <li>WSL でコマンドライン版の Claude Code にログインし直す。(済み)</li>
+    <li>再開・禁止した操作・サンドボックスの3つを小さく試す。(済み)</li>
     <li>プロファイル、セッションの起動、hub による push を作る。承認の仕組みを待ち行列の形に直す。</li>
     <li>MCP を作る。中身は <code>hub</code> コマンドを呼ぶだけにする。拡張を足す仕組みを入れる。</li>
     <li>全体作業・個別作業・ToDo の3つの画面のひな形を作る。</li>
